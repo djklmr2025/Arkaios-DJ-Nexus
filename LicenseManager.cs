@@ -8,7 +8,8 @@ namespace ArkaiosDJAssistant
 {
     public static class LicenseManager
     {
-        private static string licensePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "license.key");
+        private static string licenseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ArkaiosDJNexus");
+        private static string licensePath = Path.Combine(licenseDir, "license.key");
         private const string SALT = "ARKAIOS_SECRET_KEY_2026_NEXUS";
 
         public static string GetHardwareId()
@@ -32,10 +33,72 @@ namespace ArkaiosDJAssistant
         {
             if (!File.Exists(licensePath)) return false;
             string key = File.ReadAllText(licensePath).Trim();
-            return ValidateKey(key);
+            
+            if (!ValidateKeyLocally(key)) return false;
+
+            // Check Cloud API (Hybrid Failover)
+            string URL_PRIMARIA = "http://localhost:3000/api/licenses/validate"; // TODO: Cambiar por link Ngrok
+            string URL_SECUNDARIA = "https://tu-api-arkaios.vercel.app/api/licenses/validate"; // TODO: Cambiar por link Vercel
+
+            string hwid = GetHardwareId();
+            string jsonPayload = string.Format("{{\"key\":\"{0}\", \"hwid\":\"{1}\"}}", key, hwid);
+            string response = "";
+            bool connectionSuccess = false;
+
+            try
+            {
+                using (System.Net.WebClient client = new System.Net.WebClient())
+                {
+                    client.Headers[System.Net.HttpRequestHeader.ContentType] = "application/json";
+                    response = client.UploadString(URL_PRIMARIA, "POST", jsonPayload);
+                    connectionSuccess = true;
+                }
+            }
+            catch
+            {
+                // Fallback to Secondary Server
+                try
+                {
+                    using (System.Net.WebClient client = new System.Net.WebClient())
+                    {
+                        client.Headers[System.Net.HttpRequestHeader.ContentType] = "application/json";
+                        response = client.UploadString(URL_SECUNDARIA, "POST", jsonPayload);
+                        connectionSuccess = true;
+                    }
+                }
+                catch { /* Offline Grace Period */ }
+            }
+
+            if (connectionSuccess)
+            {
+                if (response.Contains("\"success\": false"))
+                {
+                    System.Windows.Forms.MessageBox.Show("Tu licencia ha sido revocada o bloqueada por el servidor.", "Licencia Inválida", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
+                    return false;
+                }
+
+                // Check for updates
+                if (response.Contains("\"latestVersion\":") && !response.Contains("\"latestVersion\": \"v1.0.0\""))
+                {
+                    // Parse update URL rudimentary for C# 5
+                    string updateUrl = "https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases";
+                    var result = System.Windows.Forms.MessageBox.Show(
+                        "¡Hay una nueva versión de Arkaios DJ Nexus disponible!\n\nComo tu licencia está activa, puedes actualizar gratis. ¿Deseas descargarla ahora?", 
+                        "Nueva Versión Disponible", 
+                        System.Windows.Forms.MessageBoxButtons.YesNo, 
+                        System.Windows.Forms.MessageBoxIcon.Information);
+                        
+                    if (result == System.Windows.Forms.DialogResult.Yes)
+                    {
+                        System.Diagnostics.Process.Start(updateUrl);
+                    }
+                }
+            }
+
+            return true;
         }
 
-        public static bool ValidateKey(string key)
+        public static bool ValidateKeyLocally(string key)
         {
             try
             {
@@ -71,6 +134,10 @@ namespace ArkaiosDJAssistant
 
         public static void SaveLicense(string key)
         {
+            if (!Directory.Exists(licenseDir))
+            {
+                Directory.CreateDirectory(licenseDir);
+            }
             File.WriteAllText(licensePath, key);
         }
 

@@ -72,7 +72,7 @@ namespace ArkaiosDJAssistant
         private void BtnActivate_Click(object sender, EventArgs e)
         {
             string key = txtKey.Text.Trim();
-            if (LicenseManager.ValidateKey(key))
+            if (LicenseManager.ValidateKeyLocally(key))
             {
                 LicenseManager.SaveLicense(key);
                 MessageBox.Show("¡Licencia válida! El software ha sido activado exitosamente.", "Éxito", MessageBoxButtons.OK, MessageBoxIcon.Information);
