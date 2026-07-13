@@ -38,7 +38,7 @@ namespace ArkaiosDJAssistant
 
             // Check Cloud API (Hybrid Failover)
             string URL_PRIMARIA = "http://localhost:3000/api/licenses/validate"; // TODO: Cambiar por link Ngrok
-            string URL_SECUNDARIA = "https://tu-api-arkaios.vercel.app/api/licenses/validate"; // TODO: Cambiar por link Vercel
+            string URL_SECUNDARIA = "https://servidor-arkaios-api.vercel.app/api/licenses/validate"; 
 
             string hwid = GetHardwareId();
             string jsonPayload = string.Format("{{\"key\":\"{0}\", \"hwid\":\"{1}\"}}", key, hwid);
