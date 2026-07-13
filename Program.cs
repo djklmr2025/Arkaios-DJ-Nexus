@@ -779,6 +779,13 @@ namespace ArkaiosDJAssistant
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             
+            if (!LicenseManager.IsLicensed())
+            {
+                var actForm = new ActivationForm();
+                Application.Run(actForm);
+                if (!actForm.IsActivated) return; // Exit if not activated
+            }
+
             AppSettings.Load();
             
             if (AppSettings.IsConfigured())
