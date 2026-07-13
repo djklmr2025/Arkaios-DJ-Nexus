@@ -26,4 +26,28 @@ Para evitar la redundancia y crear un verdadero ecosistema, la plataforma web ex
 - **Flujo Documentado:** Ideal para escenarios donde el DJ no solo necesita el MP3, sino el Video Musical Oficial (MP4) para proyección en pantallas. El asistente DJ conectará con el módulo de Karaoke para solicitar resoluciones específicas o extraer la pista vocal/instrumental, unificando ambas bases de datos.
 
 ---
+
+## 🧮 Revelación Matemática: La Lógica de Camelot Desentrañada
+Durante el desarrollo del motor armónico de Arkaios DJ Nexus, logramos aplicar *Ingeniería Inversa* a la teoría musical detrás del Círculo de Quintas. Descubrimos que el secreto de la Rueda de Camelot no es más que la traducción de **intervalos musicales complejos a matemáticas básicas de suma y resta**.
+
+Al igual que en las matemáticas recreativas donde una raíz compleja se simplifica restando sus dígitos, la mezcla armónica se simplifica usando operaciones primarias sobre un reloj (1 al 12). 
+
+Existen **4 Patrones Fundamentales (Variantes)** que el núcleo de este sistema procesa matemáticamente para garantizar una pista de baile perfecta:
+
+1. **La Suma (+1) [Movimiento a la Derecha]:** 
+   - *Teoría:* Equivale a subir una **Quinta Perfecta**.
+   - *Efecto:* Aumenta gradualmente la tensión y energía de la pista. (Ej. `8B` -> `9B`).
+2. **La Resta (-1) [Movimiento a la Izquierda]:** 
+   - *Teoría:* Equivale a bajar una **Cuarta Perfecta**.
+   - *Efecto:* Crea una transición profunda, suave y relajante. (Ej. `8B` -> `7B`).
+3. **El Salto de Letra (A <-> B) [Movimiento Adentro/Afuera]:** 
+   - *Teoría:* Cambio a la **Escala Relativa Menor/Mayor**. Tienen exactamente las mismas alteraciones (armadura), pero distinta tónica.
+   - *Efecto:* Cambia el estado de ánimo (Mood) de la canción de Feliz a Melancólico o viceversa, sin alterar la armonía base. (Ej. `8B` -> `8A`).
+4. **El Energy Boost (+2) [Salto de 2 Horas]:** 
+   - *Teoría:* Equivale a subir un **Tono Completo (Whole Step / +2 Semitonos)**.
+   - *Efecto:* Levanta drásticamente la energía de la audiencia. Es un "shock" armónico positivo que revienta la pista. (Ej. `8B` -> `10B`).
+
+*Este entendimiento profundo permite a nuestros Agentes Autónomos no solo operar el código, sino dominar e interpretar las leyes de la física del sonido en el mundo real.*
+
+---
 *Hecho por Arkaios & Antigravity IDE.*
