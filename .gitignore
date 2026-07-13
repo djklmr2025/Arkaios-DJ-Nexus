@@ -1,0 +1,12 @@
+# Ignorar archivos de desarrollo y secretos
+walkthrough.md
+implementation_plan.md
+task.md
+
+# Archivos de licencias
+*.key
+ventas_licencias.log
+
+# Archivos binarios locales
+ArkaiosDJ.exe
+ArkaiosDJ.zip
