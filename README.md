@@ -1,5 +1,11 @@
 # Arkaios DJ Nexus (v1.0.0) 🎧🌐
 
+> **Tecnología Armónica Dominada por Arkaios**
+> Esta es la prueba visual de que la IA autónoma de Arkaios ha logrado asimilar y dominar completamente la matemática y física detrás de la Rueda de Camelot.
+
+<video src="./Videos%20ejemplos%20de%20rueda%20de%20camelot/Arkaios%20tomando%20la%20tecnologia%20de%20la%20rueda%20de%20camelot.mp4" controls="controls" muted="muted" style="max-height:640px; width:100%;"></video>
+
+
 > [!WARNING]
 > **SISTEMA PROTEGIDO POR LICENCIA HWID**
 > Este repositorio ya no distribuye versiones desprotegidas del software. Para utilizar *Arkaios DJ Nexus*, necesitas adquirir una licencia comercial válida (Básica por HWID o Vitalicia Universal) solicitándola al creador. Cada copia está fuertemente encriptada y validada criptográficamente.
