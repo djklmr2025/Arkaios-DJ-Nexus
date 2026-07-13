@@ -1,0 +1,71 @@
+using System;
+using System.IO;
+using System.Collections.Generic;
+
+namespace ArkaiosDJAssistant
+{
+    public static class AppSettings
+    {
+        private static string settingsFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.txt");
+
+        public static string VdjHistoryFolder { get; set; }
+        public static string VdjDatabaseFile { get; set; }
+        public static string VdjExecutableFile { get; set; }
+        public static bool EnableTransparency { get; set; }
+        public static List<string> AllowedFolders { get; set; }
+
+        static AppSettings()
+        {
+            VdjHistoryFolder = "";
+            VdjDatabaseFile = "";
+            VdjExecutableFile = "";
+            EnableTransparency = false;
+            AllowedFolders = new List<string>();
+        }
+
+        public static void Load()
+        {
+            if (File.Exists(settingsFile))
+            {
+                var lines = File.ReadAllLines(settingsFile);
+                if (lines.Length >= 2)
+                {
+                    VdjHistoryFolder = lines[0];
+                    VdjDatabaseFile = lines[1];
+                }
+                if (lines.Length >= 3)
+                {
+                    EnableTransparency = lines[2] == "1";
+                }
+                if (lines.Length >= 4)
+                {
+                    VdjExecutableFile = lines[3];
+                }
+                if (lines.Length >= 5)
+                {
+                    for (int i = 4; i < lines.Length; i++)
+                    {
+                        if (!string.IsNullOrWhiteSpace(lines[i]))
+                            AllowedFolders.Add(lines[i]);
+                    }
+                }
+            }
+        }
+
+        public static void Save()
+        {
+            List<string> lines = new List<string>();
+            lines.Add(VdjHistoryFolder);
+            lines.Add(VdjDatabaseFile);
+            lines.Add(EnableTransparency ? "1" : "0");
+            lines.Add(VdjExecutableFile ?? "");
+            lines.AddRange(AllowedFolders);
+            File.WriteAllLines(settingsFile, lines.ToArray());
+        }
+        
+        public static bool IsConfigured()
+        {
+            return Directory.Exists(VdjHistoryFolder) && File.Exists(VdjDatabaseFile);
+        }
+    }
+}
