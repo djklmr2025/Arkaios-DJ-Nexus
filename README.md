@@ -1,5 +1,8 @@
 # Arkaios DJ Nexus (v1.0.0) 🎧🌐
 
+> [!WARNING]
+> **SISTEMA PROTEGIDO POR LICENCIA HWID**
+> Este repositorio ya no distribuye versiones desprotegidas del software. Para utilizar *Arkaios DJ Nexus*, necesitas adquirir una licencia comercial válida (Básica por HWID o Vitalicia Universal) solicitándola al creador. Cada copia está fuertemente encriptada y validada criptográficamente.
 **Arkaios DJ Nexus** es el ecosistema inteligente definitivo para DJs. Nace como una herramienta local ultra-optimizada para la predicción armónica, y evoluciona hacia una plataforma en la nube conectada con descargas asíncronas y motores multimedia.
 
 ## 🚀 Fase 1: El Asistente Local (Completado - v1.0)
