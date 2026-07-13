@@ -1,5 +1,11 @@
 # Arkaios DJ Nexus (v1.0.0) 🎧🌐
 
+
+
+https://github.com/user-attachments/assets/7f7c04ba-75dc-4f42-a0f6-0b04ccff4c8b
+
+
+
 > **Tecnología Armónica Dominada por Arkaios**
 > Esta es la prueba visual de que la IA autónoma de Arkaios ha logrado asimilar y dominar completamente la matemática y física detrás de la Rueda de Camelot.
 
