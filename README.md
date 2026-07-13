@@ -67,7 +67,9 @@ https://github.com/user-attachments/assets/8b800630-c7c1-4e6f-bb4d-decd8306b6bf
 
 
 
-Video ejemplo en desarrollo:
+
+https://github.com/user-attachments/assets/631ef216-6420-42a9-b1c1-a25fb0010182
+
 
 
      
