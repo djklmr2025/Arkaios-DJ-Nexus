@@ -45,7 +45,9 @@ Para evitar la redundancia y crear un verdadero ecosistema, la plataforma web ex
 ## 🧮 Revelación Matemática: La Lógica de Camelot Desentrañada
 Durante el desarrollo del motor armónico de Arkaios DJ Nexus, logramos aplicar *Ingeniería Inversa* a la teoría musical detrás del Círculo de Quintas. Descubrimos que el secreto de la Rueda de Camelot no es más que la traducción de **intervalos musicales complejos a matemáticas básicas de suma y resta**.
 
-![Regla Izquierda Derecha](tip%20armonico%20regla%20de%20izquierda%20o%20derecha.jpg)
+<div align="center">
+  <img src="tip%20armonico%20regla%20de%20izquierda%20o%20derecha.jpg" alt="Regla Izquierda Derecha">
+</div>
 
 Al igual que en las matemáticas recreativas donde una raíz compleja se simplifica restando sus dígitos, la mezcla armónica se simplifica usando operaciones primarias sobre un reloj (1 al 12). 
 
