@@ -39,15 +39,46 @@ Existen **4 Patrones Fundamentales (Variantes)** que el núcleo de este sistema 
 1. **La Suma (+1) [Movimiento a la Derecha]:** 
    - *Teoría:* Equivale a subir una **Quinta Perfecta**.
    - *Efecto:* Aumenta gradualmente la tensión y energía de la pista. (Ej. `8B` -> `9B`).
+
+
+
+https://github.com/user-attachments/assets/ae147b06-efcc-4bcb-8daf-06a80d07ec90
+
+
+    
 2. **La Resta (-1) [Movimiento a la Izquierda]:** 
    - *Teoría:* Equivale a bajar una **Cuarta Perfecta**.
    - *Efecto:* Crea una transición profunda, suave y relajante. (Ej. `8B` -> `7B`).
+
+
+
+
+https://github.com/user-attachments/assets/8b800630-c7c1-4e6f-bb4d-decd8306b6bf
+
+
+
+     
 3. **El Salto de Letra (A <-> B) [Movimiento Adentro/Afuera]:** 
    - *Teoría:* Cambio a la **Escala Relativa Menor/Mayor**. Tienen exactamente las mismas alteraciones (armadura), pero distinta tónica.
    - *Efecto:* Cambia el estado de ánimo (Mood) de la canción de Feliz a Melancólico o viceversa, sin alterar la armonía base. (Ej. `8B` -> `8A`).
+
+
+
+Video ejemplo en desarrollo:
+
+
+     
 4. **El Energy Boost (+2) [Salto de 2 Horas]:** 
    - *Teoría:* Equivale a subir un **Tono Completo (Whole Step / +2 Semitonos)**.
    - *Efecto:* Levanta drásticamente la energía de la audiencia. Es un "shock" armónico positivo que revienta la pista. (Ej. `8B` -> `10B`).
+  
+
+
+
+https://github.com/user-attachments/assets/419d1a87-edbd-4736-9969-c67832fe88c2
+
+
+
 
 ![Rueda de Camelot Masterizada](masterizacion%20rueda%20de%20camelot%20en%20sistemas%20digitales.webp)
 
