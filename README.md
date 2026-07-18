@@ -1,5 +1,14 @@
 # Arkaios DJ Nexus (v1.0.0) 🎧🌐
 
+> [!IMPORTANT]
+> **PRÓXIMO RELEASE OFICIAL EN PREPARACIÓN**
+> Actualmente no se distribuye un instalador oficial desde GitHub Releases. La
+> siguiente versión integrará el instalador actualizado y la activación vinculada
+> a una cuenta de Arkaios World. El tiempo estimado de desarrollo y validación es
+> de **1 a 2 jornadas de trabajo**, sujeto a las pruebas finales de Firebase,
+> licencia por dispositivo e instalación limpia. El instalador se publicará aquí
+> solamente después de completar esas verificaciones.
+
 > **Tecnología Armónica Dominada por Arkaios**
 > Esta es la prueba visual de que la IA autónoma de Arkaios ha logrado asimilar y dominar completamente la matemática y física detrás de la Rueda de Camelot.
 
