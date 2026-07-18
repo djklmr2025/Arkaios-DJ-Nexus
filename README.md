@@ -100,3 +100,15 @@ Este proyecto no es solo el resultado de líneas de código, sino el fruto de un
 
 ---
 *Hecho por Arkaios & Antigravity IDE.*
+
+## Búsqueda y descarga independiente
+
+La pestaña `Buscar y descargar` consulta resultados y formatos reales mediante el
+`yt-dlp.exe` incluido. La carga de una pista en VirtualDJ no inicia búsquedas de red.
+Las descargas se separan en `Music`, `Video` y `Karaoke` dentro de la primera carpeta
+permitida configurada para la biblioteca; si no existe, se usa la carpeta anfitriona
+que contiene el `database.xml` de VirtualDJ.
+
+La calidad mostrada es la máxima disponible en la fuente. MP3 permite salida a 320
+o 192 kbps, M4A conserva el mejor audio disponible y video permite máxima calidad,
+1080p estable o 720p estándar.

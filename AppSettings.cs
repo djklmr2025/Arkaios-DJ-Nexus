@@ -14,6 +14,35 @@ namespace ArkaiosDJAssistant
         public static bool EnableTransparency { get; set; }
         public static List<string> AllowedFolders { get; set; }
 
+        public static string MediaLibraryRoot
+        {
+            get
+            {
+                foreach (string folder in AllowedFolders)
+                {
+                    if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                        return folder;
+                }
+
+                if (!string.IsNullOrWhiteSpace(VdjDatabaseFile))
+                {
+                    string virtualDjFolder = Path.GetDirectoryName(VdjDatabaseFile);
+                    if (!string.IsNullOrWhiteSpace(virtualDjFolder) && Directory.Exists(virtualDjFolder))
+                        return virtualDjFolder;
+                }
+
+                string music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+                return Path.Combine(music, "VirtualDJ_Downloads");
+            }
+        }
+
+        public static string GetDownloadFolder(string mediaType)
+        {
+            string subfolder = string.Equals(mediaType, "karaoke", StringComparison.OrdinalIgnoreCase) ? "Karaoke" :
+                               string.Equals(mediaType, "video", StringComparison.OrdinalIgnoreCase) ? "Video" : "Music";
+            return Path.Combine(MediaLibraryRoot, subfolder);
+        }
+
         static AppSettings()
         {
             VdjHistoryFolder = "";

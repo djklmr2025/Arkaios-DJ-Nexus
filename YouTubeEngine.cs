@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using System.Diagnostics;
 using System.IO;
-using System.Text.RegularExpressions;
+using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 
@@ -13,111 +14,145 @@ namespace ArkaiosDJAssistant
         public string Title { get; set; }
         public string Url { get; set; }
         public string Duration { get; set; }
+        public string Uploader { get; set; }
+        public long ViewCount { get; set; }
+        public int MaxHeight { get; set; }
+        public int MaxAudioKbps { get; set; }
+        public string MaximumQuality { get { return MaxHeight > 0 ? MaxHeight + "p / audio " + MaxAudioKbps + " kbps" : "audio " + MaxAudioKbps + " kbps"; } }
     }
 
     public static class YouTubeEngine
     {
-        private static string ytDlpPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "yt-dlp.exe");
+        private static readonly string YtDlpPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "yt-dlp.exe");
+        private static readonly string ErrorLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "yt-dlp-errors.log");
 
-        public static async Task<List<YouTubeTrack>> SearchArtistAsync(string artist)
+        public static Task<List<YouTubeTrack>> SearchArtistAsync(string artist)
         {
-            List<YouTubeTrack> tracks = new List<YouTubeTrack>();
-            if (string.IsNullOrEmpty(artist)) return tracks;
-            if (!File.Exists(ytDlpPath)) return tracks;
+            return SearchAsync(artist, "music", 5);
+        }
+
+        public static async Task<List<YouTubeTrack>> SearchAsync(string query, string mediaType, int limit)
+        {
+            var tracks = new List<YouTubeTrack>();
+            if (string.IsNullOrWhiteSpace(query) || !File.Exists(YtDlpPath)) return tracks;
+
+            string suffix = mediaType == "karaoke" ? " karaoke lyrics" : mediaType == "video" ? " official music video" : " official audio";
+            string search = "ytsearch" + Math.Max(1, Math.Min(limit, 20)) + ":" + query + suffix;
+            var result = await RunAsync(new[] { "--dump-single-json", "--no-warnings", "--no-playlist", search });
+            if (result.ExitCode != 0 || string.IsNullOrWhiteSpace(result.Output)) return tracks;
 
             try
             {
-                return await Task.Run(() =>
-                {
-                    ProcessStartInfo psi = new ProcessStartInfo
-                    {
-                        FileName = ytDlpPath,
-                        Arguments = string.Format("\"ytsearch5:{0} official audio\" --dump-json --no-playlist", artist),
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true,
-                        StandardOutputEncoding = System.Text.Encoding.UTF8
-                    };
+                var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                var root = serializer.Deserialize<Dictionary<string, object>>(result.Output);
+                object entriesObject;
+                if (root == null || !root.TryGetValue("entries", out entriesObject)) return tracks;
+                var entries = entriesObject as IEnumerable;
+                if (entries == null) return tracks;
 
-                    using (Process p = Process.Start(psi))
+                foreach (object entryObject in entries)
+                {
+                    var entry = entryObject as Dictionary<string, object>;
+                    if (entry == null) continue;
+                    int duration = ToInt(entry, "duration");
+                    int maxHeight = 0;
+                    int maxAudio = 0;
+                    object formatsObject;
+                    if (entry.TryGetValue("formats", out formatsObject))
                     {
-                        JavaScriptSerializer jss = new JavaScriptSerializer();
-                        string line;
-                        while ((line = p.StandardOutput.ReadLine()) != null)
+                        var formats = formatsObject as IEnumerable;
+                        if (formats != null) foreach (object formatObject in formats)
                         {
-                            try
-                            {
-                                var dict = jss.Deserialize<Dictionary<string, object>>(line);
-                                if (dict != null)
-                                {
-                                    string title = dict.ContainsKey("title") ? dict["title"].ToString() : "";
-                                    string url = dict.ContainsKey("webpage_url") ? dict["webpage_url"].ToString() : "";
-                                    int duration = dict.ContainsKey("duration") ? Convert.ToInt32(dict["duration"]) : 0;
-                                    
-                                    if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(url))
-                                    {
-                                        string time = string.Format("{0}:{1:00}", duration / 60, duration % 60);
-                                        tracks.Add(new YouTubeTrack { Title = title, Url = url, Duration = time });
-                                    }
-                                }
-                            }
-                            catch { }
+                            var format = formatObject as Dictionary<string, object>;
+                            if (format == null) continue;
+                            maxHeight = Math.Max(maxHeight, ToInt(format, "height"));
+                            maxAudio = Math.Max(maxAudio, ToInt(format, "abr"));
                         }
                     }
-                    return tracks;
-                });
+
+                    string url = ToString(entry, "webpage_url");
+                    if (string.IsNullOrEmpty(url)) url = ToString(entry, "url");
+                    if (string.IsNullOrEmpty(url)) continue;
+                    tracks.Add(new YouTubeTrack
+                    {
+                        Title = ToString(entry, "title"), Url = url, Uploader = ToString(entry, "uploader"),
+                        Duration = string.Format("{0}:{1:00}", duration / 60, duration % 60),
+                        ViewCount = ToLong(entry, "view_count"), MaxHeight = maxHeight, MaxAudioKbps = maxAudio
+                    });
+                }
             }
-            catch
-            {
-                return tracks;
-            }
+            catch (Exception ex) { AppendError("Search JSON: " + ex); }
+            return tracks;
         }
 
-        public static async Task<string> DownloadAudioAsync(string url)
+        public static Task<string> DownloadAudioAsync(string url)
         {
-            if (!File.Exists(ytDlpPath)) return null;
-            
-            // Usamos la carpeta de música del usuario
-            string downloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyMusic), "VirtualDJ_Downloads");
-            if (!Directory.Exists(downloadFolder)) Directory.CreateDirectory(downloadFolder);
-
-            try
-            {
-                return await Task.Run(() =>
-                {
-                    // Guardar como: "VirtualDJ_Downloads\Artista - Titulo.mp3"
-                    string outputTemplate = Path.Combine(downloadFolder, "%(title)s.%(ext)s");
-                    
-                    ProcessStartInfo psi = new ProcessStartInfo
-                    {
-                        FileName = ytDlpPath,
-                        Arguments = string.Format("-x --audio-format mp3 -o \"{0}\" \"{1}\"", outputTemplate, url),
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true
-                    };
-
-                    using (Process p = Process.Start(psi))
-                    {
-                        string output = p.StandardOutput.ReadToEnd();
-                        p.WaitForExit();
-
-                        var match = Regex.Match(output, @"Destination:\s*(.+?\.mp3)");
-                        if (match.Success) return match.Groups[1].Value.Trim();
-
-                        match = Regex.Match(output, @"\[download\]\s*(.+?\.mp3)\s*has already been downloaded");
-                        if (match.Success) return match.Groups[1].Value.Trim();
-
-                        match = Regex.Match(output, @"\[ExtractAudio\] Destination:\s*(.+?\.mp3)");
-                        if (match.Success) return match.Groups[1].Value.Trim();
-                    }
-                    return null;
-                });
-            }
-            catch
-            {
-                return null;
-            }
+            return DownloadAsync(url, "music", "MP3 320 kbps");
         }
+
+        public static async Task<string> DownloadAsync(string url, string mediaType, string quality)
+        {
+            if (!File.Exists(YtDlpPath) || string.IsNullOrWhiteSpace(url)) return null;
+            string folder = AppSettings.GetDownloadFolder(mediaType);
+            Directory.CreateDirectory(folder);
+            string template = Path.Combine(folder, "%(artist,uploader)s - %(title)s [%(id)s].%(ext)s");
+            var args = new List<string> { "--no-playlist", "--windows-filenames", "--print", "after_move:filepath", "-o", template };
+
+            if (mediaType == "music")
+            {
+                if (quality.StartsWith("M4A", StringComparison.OrdinalIgnoreCase))
+                    args.AddRange(new[] { "-f", "bestaudio[ext=m4a]/bestaudio", "--remux-video", "m4a" });
+                else
+                {
+                    string bitrate = quality.Contains("192") ? "192" : "320";
+                    args.AddRange(new[] { "-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", bitrate + "K" });
+                }
+            }
+            else
+            {
+                string cap = quality.StartsWith("1080") ? "[height<=1080]" : quality.StartsWith("720") ? "[height<=720]" : "";
+                args.AddRange(new[] { "-f", "bestvideo" + cap + "+bestaudio/best" + cap, "--merge-output-format", "mp4" });
+            }
+            args.Add(url);
+
+            var result = await RunAsync(args.ToArray());
+            if (result.ExitCode != 0) return null;
+            string[] lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            for (int i = lines.Length - 1; i >= 0; i--) if (File.Exists(lines[i].Trim())) return lines[i].Trim();
+            return null;
+        }
+
+        private static async Task<ProcessResult> RunAsync(string[] args)
+        {
+            return await Task.Run(() =>
+            {
+                var psi = new ProcessStartInfo { FileName = YtDlpPath, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
+                psi.Arguments = JoinArguments(args);
+                using (var process = Process.Start(psi))
+                {
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+                    process.WaitForExit();
+                    if (process.ExitCode != 0) AppendError(DateTime.Now + Environment.NewLine + error);
+                    return new ProcessResult { ExitCode = process.ExitCode, Output = output };
+                }
+            });
+        }
+
+        private static string ToString(Dictionary<string, object> value, string key) { object raw; return value.TryGetValue(key, out raw) && raw != null ? raw.ToString() : ""; }
+        private static int ToInt(Dictionary<string, object> value, string key) { int parsed; return int.TryParse(ToString(value, key), out parsed) ? parsed : 0; }
+        private static long ToLong(Dictionary<string, object> value, string key) { long parsed; return long.TryParse(ToString(value, key), out parsed) ? parsed : 0; }
+        private static void AppendError(string error) { try { File.AppendAllText(ErrorLogPath, error + Environment.NewLine, Encoding.UTF8); } catch { } }
+        private static string JoinArguments(string[] args)
+        {
+            var joined = new StringBuilder();
+            foreach (string arg in args)
+            {
+                if (joined.Length > 0) joined.Append(' ');
+                joined.Append('"').Append((arg ?? "").Replace("\"", "\\\"")).Append('"');
+            }
+            return joined.ToString();
+        }
+        private class ProcessResult { public int ExitCode; public string Output; }
     }
 }
