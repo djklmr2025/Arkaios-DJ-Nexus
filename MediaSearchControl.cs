@@ -45,7 +45,7 @@ namespace ArkaiosDJAssistant
             searchButton.Click += async (s, e) => await SearchAsync();
             var folderButton = new Button { Text = "Abrir destino", AutoSize = true };
             folderButton.Click += (s, e) => OpenDestination();
-            adjustButton = new Button { Text = "Ajustar a Google Música/Video (simulado)", AutoSize = true };
+            adjustButton = new Button { Text = "Ajustar con Arkaios World", AutoSize = true };
             adjustButton.Click += async (s, e) => await AdjustQueryAsync();
             toolbar.Controls.AddRange(new Control[] { queryBox, platformBox, typeBox, qualityBox, searchButton, folderButton, adjustButton });
 
@@ -118,7 +118,7 @@ namespace ArkaiosDJAssistant
             SetBusy(true, "Validando escritura con metadatos públicos de música/video...", adjustButton, "Ajustando...");
             string suggestion;
             try { suggestion = await YouTubeEngine.SuggestCanonicalQueryAsync(original, SelectedType); }
-            finally { SetBusy(false, null, adjustButton, "Ajustar a Google Música/Video (simulado)"); }
+            finally { SetBusy(false, null, adjustButton, "Ajustar con Arkaios World"); }
             if (string.IsNullOrWhiteSpace(suggestion))
             {
                 statusLabel.Text = "No encontré una corrección suficientemente confiable; conserva o amplía tu consulta.";
@@ -127,7 +127,7 @@ namespace ArkaiosDJAssistant
 
             DialogResult answer = MessageBox.Show(
                 "Consulta escrita:\n" + original + "\n\n¿Quisiste decir?\n" + suggestion +
-                "\n\nValidación real: metadatos públicos de YouTube. La etiqueta Google Música/Video es simulada.",
+                "\n\nArkaios World validó la sugerencia contra metadatos públicos reales de YouTube.",
                 "Ajustar metadatos antes de buscar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (answer == DialogResult.Yes)
             {

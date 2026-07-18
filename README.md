@@ -125,9 +125,13 @@ Bandcamp, Deezer, TIDAL, Amazon Music, Audiomack, Mixcloud y Beatport. YouTube
 presenta resultados y descargas dentro de ARKAIOS; las demás opciones abren su
 búsqueda oficial hasta que se configuren las APIs o sesiones autorizadas respectivas.
 
-`Ajustar a Google Música/Video (simulado)` consulta candidatos reales mediante
-metadatos públicos de YouTube y presenta `¿Quisiste decir?` antes de modificar la
-búsqueda. La interfaz identifica expresamente que no es una API oficial de Google Music.
+`Ajustar con Arkaios World` consulta candidatos mediante metadatos públicos reales de
+YouTube y presenta `¿Quisiste decir?` antes de modificar la búsqueda. Arkaios World
+actúa como la capa de validación y mantiene identificada la fuente consultada.
+
+`Crear_Installer_EXE.cmd` compila con Inno Setup el instalador Windows autónomo
+`dist\ArkaiosDJ_Nexus_Setup.exe`, con asistente en español, accesos directos,
+activación dentro de la aplicación y desinstalador registrado.
 
 La pestaña `Descargas / Hub local` reescanea de forma persistente las carpetas
 `Music`, `Video` y `Karaoke`, permite buscar por el nombre real del archivo,
