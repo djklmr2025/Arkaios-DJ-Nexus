@@ -799,11 +799,15 @@ namespace ArkaiosDJAssistant
         private void RefreshVirtualDjLibrary()
         {
             lblStatus.Text = "Actualizando database.xml y motor Camelot...";
+            downloadHub.SetLibraryRefreshBusy(true, "Actualizando database.xml y motor Camelot...");
             Task.Run(() =>
             {
                 LoadDatabase(AppSettings.VdjDatabaseFile);
                 if (IsHandleCreated && !IsDisposed) Invoke(new Action(() =>
-                    lblStatus.Text = string.Format("Biblioteca actualizada: {0} tracks con metadatos de VirtualDJ.", allTracks.Count)));
+                {
+                    lblStatus.Text = string.Format("Biblioteca actualizada: {0} tracks con metadatos de VirtualDJ.", allTracks.Count);
+                    downloadHub.SetLibraryRefreshBusy(false, lblStatus.Text);
+                }));
             });
         }
 

@@ -18,6 +18,7 @@ namespace ArkaiosDJAssistant
         public long ViewCount { get; set; }
         public int MaxHeight { get; set; }
         public int MaxAudioKbps { get; set; }
+        public string AvailableOutputs { get; set; }
         public string MaximumQuality { get { return MaxHeight > 0 ? MaxHeight + "p / audio " + MaxAudioKbps + " kbps" : "audio " + MaxAudioKbps + " kbps"; } }
     }
 
@@ -29,6 +30,19 @@ namespace ArkaiosDJAssistant
         public static Task<List<YouTubeTrack>> SearchArtistAsync(string artist)
         {
             return SearchAsync(artist, "music", 5);
+        }
+
+        public static async Task<string> SuggestCanonicalQueryAsync(string query, string mediaType)
+        {
+            List<YouTubeTrack> matches = await SearchAsync(query, mediaType, 3);
+            if (matches.Count == 0) return null;
+            YouTubeTrack best = matches[0];
+            string title = (best.Title ?? "").Trim();
+            string uploader = (best.Uploader ?? "").Trim();
+            if (title.Length == 0) return null;
+            if (uploader.Length > 0 && title.IndexOf(uploader, StringComparison.OrdinalIgnoreCase) < 0)
+                return uploader + " - " + title;
+            return title;
         }
 
         public static async Task<List<YouTubeTrack>> SearchAsync(string query, string mediaType, int limit)
@@ -77,7 +91,8 @@ namespace ArkaiosDJAssistant
                     {
                         Title = ToString(entry, "title"), Url = url, Uploader = ToString(entry, "uploader"),
                         Duration = string.Format("{0}:{1:00}", duration / 60, duration % 60),
-                        ViewCount = ToLong(entry, "view_count"), MaxHeight = maxHeight, MaxAudioKbps = maxAudio
+                        ViewCount = ToLong(entry, "view_count"), MaxHeight = maxHeight, MaxAudioKbps = maxAudio,
+                        AvailableOutputs = mediaType == "music" ? "MP3 / M4A" : "MP4"
                     });
                 }
             }

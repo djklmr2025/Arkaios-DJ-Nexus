@@ -120,8 +120,22 @@ puede arrastrarse directamente hacia un plato de VirtualDJ.
 Cada consulta solicita hasta 20 resultados directamente a YouTube mediante `yt-dlp`,
 incluidos videos musicales y karaoke según el tipo seleccionado.
 
+El selector de plataforma incluye YouTube, Spotify, Apple Music, SoundCloud,
+Bandcamp, Deezer, TIDAL, Amazon Music, Audiomack, Mixcloud y Beatport. YouTube
+presenta resultados y descargas dentro de ARKAIOS; las demás opciones abren su
+búsqueda oficial hasta que se configuren las APIs o sesiones autorizadas respectivas.
+
+`Ajustar a Google Música/Video (simulado)` consulta candidatos reales mediante
+metadatos públicos de YouTube y presenta `¿Quisiste decir?` antes de modificar la
+búsqueda. La interfaz identifica expresamente que no es una API oficial de Google Music.
+
 La pestaña `Descargas / Hub local` reescanea de forma persistente las carpetas
 `Music`, `Video` y `Karaoke`, permite buscar por el nombre real del archivo,
 previsualizar con doble clic y arrastrar directamente a VirtualDJ. El botón
 `Actualizar biblioteca y Camelot` vuelve a leer `database.xml`; una pista nueva
 entra al motor armónico cuando VirtualDJ ya calculó y guardó su BPM y tonalidad.
+
+Las búsquedas, descargas, validación inteligente, reescaneo del Hub y actualización
+Camelot muestran una barra de progreso animada y deshabilitan temporalmente la acción
+repetida. Los resultados online declaran su salida (`MP3/M4A` o `MP4`) y el Hub
+muestra la extensión real de cada archivo descargado o preexistente.

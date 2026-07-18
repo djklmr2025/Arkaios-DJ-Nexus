@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ArkaiosDJAssistant
@@ -15,6 +16,9 @@ namespace ArkaiosDJAssistant
         private readonly ComboBox typeBox;
         private readonly ListView fileList;
         private readonly Label statusLabel;
+        private readonly ProgressBar progressBar;
+        private readonly FlowLayoutPanel toolbar;
+        private readonly Button refreshButton;
         private readonly List<HubFile> files = new List<HubFile>();
 
         public DownloadHubControl()
@@ -22,7 +26,7 @@ namespace ArkaiosDJAssistant
             Dock = DockStyle.Fill;
             BackColor = Color.FromArgb(20, 20, 20);
 
-            var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 44, Padding = new Padding(8), WrapContents = false };
+            toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 44, Padding = new Padding(8), WrapContents = false };
             searchBox = new TextBox { Width = 320 };
             searchBox.TextChanged += (s, e) => ApplyFilter();
             typeBox = new ComboBox { Width = 120, DropDownStyle = ComboBoxStyle.DropDownList };
@@ -31,11 +35,11 @@ namespace ArkaiosDJAssistant
             typeBox.SelectedIndexChanged += (s, e) => ApplyFilter();
             var scanButton = new Button { Text = "Reescanear Hub", AutoSize = true };
             scanButton.Click += (s, e) => Scan();
-            var refreshButton = new Button { Text = "Actualizar biblioteca y Camelot", AutoSize = true };
+            refreshButton = new Button { Text = "Actualizar biblioteca y Camelot", AutoSize = true };
             refreshButton.Click += (s, e) => { var handler = RefreshLibraryRequested; if (handler != null) handler(); };
             var folderButton = new Button { Text = "Abrir carpeta", AutoSize = true };
             folderButton.Click += (s, e) => OpenSelectedFolder();
-            top.Controls.AddRange(new Control[] { searchBox, typeBox, scanButton, refreshButton, folderButton });
+            toolbar.Controls.AddRange(new Control[] { searchBox, typeBox, scanButton, refreshButton, folderButton });
 
             fileList = new ListView { Dock = DockStyle.Fill, View = View.Details, FullRowSelect = true, MultiSelect = true, BackColor = Color.FromArgb(35, 35, 35), ForeColor = Color.White };
             fileList.Columns.Add("Nombre real", 390);
@@ -46,20 +50,34 @@ namespace ArkaiosDJAssistant
             fileList.ItemDrag += FileList_ItemDrag;
             fileList.MouseDoubleClick += (s, e) => PreviewSelected();
             statusLabel = new Label { Dock = DockStyle.Bottom, Height = 32, Padding = new Padding(8), ForeColor = Color.LightGray };
+            progressBar = new ProgressBar { Dock = DockStyle.Bottom, Height = 6, Style = ProgressBarStyle.Marquee, MarqueeAnimationSpeed = 25, Visible = false };
 
             Controls.Add(fileList);
+            Controls.Add(progressBar);
             Controls.Add(statusLabel);
-            Controls.Add(top);
+            Controls.Add(toolbar);
             Load += (s, e) => Scan();
         }
 
-        public void Scan()
+        public async void Scan()
         {
-            files.Clear();
-            AddFolder("Music", AppSettings.GetDownloadFolder("music"));
-            AddFolder("Video", AppSettings.GetDownloadFolder("video"));
-            AddFolder("Karaoke", AppSettings.GetDownloadFolder("karaoke"));
-            ApplyFilter();
+            SetBusy(true, "Escaneando archivos reales de Music, Video y Karaoke...");
+            try
+            {
+                List<HubFile> found = await Task.Run(() =>
+                {
+                    var scanned = new List<HubFile>();
+                    scanned.AddRange(ScanFolder("Music", AppSettings.GetDownloadFolder("music")));
+                    scanned.AddRange(ScanFolder("Video", AppSettings.GetDownloadFolder("video")));
+                    scanned.AddRange(ScanFolder("Karaoke", AppSettings.GetDownloadFolder("karaoke")));
+                    return scanned;
+                });
+                files.Clear();
+                files.AddRange(found);
+                ApplyFilter();
+            }
+            catch (Exception ex) { statusLabel.Text = "No se pudo completar el escaneo: " + ex.Message; }
+            finally { SetBusy(false, null); }
         }
 
         public void AddDownloadedFile(string path)
@@ -68,16 +86,31 @@ namespace ArkaiosDJAssistant
             Scan();
         }
 
-        private void AddFolder(string type, string folder)
+        private static List<HubFile> ScanFolder(string type, string folder)
         {
-            if (!Directory.Exists(folder)) return;
+            var found = new List<HubFile>();
+            if (!Directory.Exists(folder)) return found;
             string[] allowed = { ".mp3", ".m4a", ".aac", ".wav", ".flac", ".ogg", ".mp4", ".mkv", ".webm", ".avi", ".mov" };
             try
             {
                 foreach (string path in Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories))
-                    if (allowed.Contains(Path.GetExtension(path).ToLowerInvariant())) files.Add(new HubFile { Path = path, Type = type });
+                    if (allowed.Contains(Path.GetExtension(path).ToLowerInvariant())) found.Add(new HubFile { Path = path, Type = type });
             }
-            catch (Exception ex) { statusLabel.Text = "No se pudo escanear " + folder + ": " + ex.Message; }
+            catch { }
+            return found;
+        }
+
+        private void SetBusy(bool busy, string message)
+        {
+            progressBar.Visible = busy;
+            toolbar.Enabled = !busy;
+            if (!string.IsNullOrEmpty(message)) statusLabel.Text = message;
+        }
+
+        public void SetLibraryRefreshBusy(bool busy, string message)
+        {
+            SetBusy(busy, message);
+            refreshButton.Text = busy ? "Actualizando..." : "Actualizar biblioteca y Camelot";
         }
 
         private void ApplyFilter()
