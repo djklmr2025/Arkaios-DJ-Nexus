@@ -112,3 +112,16 @@ que contiene el `database.xml` de VirtualDJ.
 La calidad mostrada es la máxima disponible en la fuente. MP3 permite salida a 320
 o 192 kbps, M4A conserva el mejor audio disponible y video permite máxima calidad,
 1080p estable o 720p estándar.
+
+`Previsualizar` abre el resultado original antes de descargar. `Descargar al Hub`
+guarda el archivo y lo agrega al final de la lista `Auto Help + Camelot`, desde donde
+puede arrastrarse directamente hacia un plato de VirtualDJ.
+
+Cada consulta solicita hasta 20 resultados directamente a YouTube mediante `yt-dlp`,
+incluidos videos musicales y karaoke según el tipo seleccionado.
+
+La pestaña `Descargas / Hub local` reescanea de forma persistente las carpetas
+`Music`, `Video` y `Karaoke`, permite buscar por el nombre real del archivo,
+previsualizar con doble clic y arrastrar directamente a VirtualDJ. El botón
+`Actualizar biblioteca y Camelot` vuelve a leer `database.xml`; una pista nueva
+entra al motor armónico cuando VirtualDJ ya calculó y guardó su BPM y tonalidad.

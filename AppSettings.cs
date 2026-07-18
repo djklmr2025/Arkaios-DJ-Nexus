@@ -21,7 +21,19 @@ namespace ArkaiosDJAssistant
                 foreach (string folder in AllowedFolders)
                 {
                     if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder))
+                    {
+                        string leaf = new DirectoryInfo(folder).Name;
+                        if (string.Equals(leaf, "music", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(leaf, "musica", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(leaf, "música", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(leaf, "video", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(leaf, "karaoke", StringComparison.OrdinalIgnoreCase))
+                        {
+                            DirectoryInfo parent = Directory.GetParent(folder);
+                            if (parent != null) return parent.FullName;
+                        }
                         return folder;
+                    }
                 }
 
                 if (!string.IsNullOrWhiteSpace(VdjDatabaseFile))

@@ -10,6 +10,7 @@ namespace ArkaiosDJAssistant
 {
     public class MediaSearchControl : UserControl
     {
+        public event Action<string> TrackSentToHub;
         private readonly TextBox queryBox;
         private readonly ComboBox typeBox;
         private readonly ComboBox qualityBox;
@@ -47,8 +48,14 @@ namespace ArkaiosDJAssistant
             resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Canal", DataPropertyName = "Uploader", Width = 150 });
             resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Duración", DataPropertyName = "Duration", Width = 75 });
             resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Máximo real", DataPropertyName = "MaximumQuality", Width = 120 });
-            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "Acción", Text = "Descargar", UseColumnTextForButtonValue = true, Width = 95 });
-            resultsGrid.CellContentClick += async (s, e) => { if (e.RowIndex >= 0 && e.ColumnIndex == 4) await DownloadAsync(e.RowIndex); };
+            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "Vista previa", Text = "Previsualizar", UseColumnTextForButtonValue = true, Width = 105 });
+            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "Hub", Text = "Descargar al Hub", UseColumnTextForButtonValue = true, Width = 125 });
+            resultsGrid.CellContentClick += async (s, e) =>
+            {
+                if (e.RowIndex < 0) return;
+                if (e.ColumnIndex == 4) Preview(e.RowIndex);
+                else if (e.ColumnIndex == 5) await DownloadAsync(e.RowIndex);
+            };
 
             statusLabel = new Label { Dock = DockStyle.Bottom, Height = 34, Padding = new Padding(8), ForeColor = Color.LightGray };
             Controls.Add(resultsGrid);
@@ -74,7 +81,7 @@ namespace ArkaiosDJAssistant
             if (string.IsNullOrWhiteSpace(queryBox.Text)) return;
             statusLabel.Text = "Buscando y leyendo formatos reales con yt-dlp...";
             resultsGrid.DataSource = null;
-            results = await YouTubeEngine.SearchAsync(queryBox.Text.Trim(), SelectedType, 10);
+            results = await YouTubeEngine.SearchAsync(queryBox.Text.Trim(), SelectedType, 20);
             resultsGrid.DataSource = results;
             statusLabel.Text = results.Count == 0 ? "No hubo resultados. Verifica yt-dlp o la conexión." :
                 string.Format("{0} resultados. Destino: {1}", results.Count, AppSettings.GetDownloadFolder(SelectedType));
@@ -87,7 +94,22 @@ namespace ArkaiosDJAssistant
             statusLabel.Text = "Descargando " + results[rowIndex].Title + "...";
             string saved = await YouTubeEngine.DownloadAsync(results[rowIndex].Url, SelectedType, qualityBox.SelectedItem.ToString());
             resultsGrid.Enabled = true;
-            statusLabel.Text = string.IsNullOrEmpty(saved) ? "La descarga falló; consulta yt-dlp-errors.log." : "Guardado: " + saved;
+            if (string.IsNullOrEmpty(saved))
+            {
+                statusLabel.Text = "La descarga falló; consulta yt-dlp-errors.log.";
+                return;
+            }
+
+            statusLabel.Text = "Guardado y enviado al Hub: " + saved;
+            var handler = TrackSentToHub;
+            if (handler != null) handler(saved);
+        }
+
+        private void Preview(int rowIndex)
+        {
+            if (rowIndex >= results.Count || string.IsNullOrWhiteSpace(results[rowIndex].Url)) return;
+            try { Process.Start(results[rowIndex].Url); }
+            catch (Exception ex) { statusLabel.Text = "No se pudo abrir la vista previa: " + ex.Message; }
         }
 
         private void OpenDestination()

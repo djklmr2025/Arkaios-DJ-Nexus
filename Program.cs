@@ -119,6 +119,8 @@ namespace ArkaiosDJAssistant
         private bool isIdle = true;
         private double baseOpacity = 1.0;
         private readonly bool automaticOnlineSearchEnabled = false;
+        private readonly List<string> downloadedHubTracks = new List<string>();
+        private DownloadHubControl downloadHub;
 
         public MainForm()
         {
@@ -140,10 +142,17 @@ namespace ArkaiosDJAssistant
             var tabs = new TabControl { Dock = DockStyle.Fill };
             var assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
             var mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
+            var hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
             assistantTab.Controls.Add(mainPanel);
-            mediaTab.Controls.Add(new MediaSearchControl());
+            var mediaSearch = new MediaSearchControl();
+            mediaSearch.TrackSentToHub += path => { AddTrackToHub(path); downloadHub.AddDownloadedFile(path); };
+            mediaTab.Controls.Add(mediaSearch);
+            downloadHub = new DownloadHubControl();
+            downloadHub.RefreshLibraryRequested += RefreshVirtualDjLibrary;
+            hubTab.Controls.Add(downloadHub);
             tabs.TabPages.Add(assistantTab);
             tabs.TabPages.Add(mediaTab);
+            tabs.TabPages.Add(hubTab);
             this.Controls.Add(tabs);
 
             lblNowPlaying = new Label
@@ -457,6 +466,7 @@ namespace ArkaiosDJAssistant
         {
             try
             {
+                var loadedTracks = new List<Track>();
                 using (FileStream fs = new FileStream(xmlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 using (XmlReader reader = XmlReader.Create(fs))
                 {
@@ -507,13 +517,14 @@ namespace ArkaiosDJAssistant
                                     currentTrack.FileType = Path.GetExtension(currentTrack.FilePath).ToLower();
                                     if (string.IsNullOrEmpty(currentTrack.Title)) currentTrack.Title = Path.GetFileNameWithoutExtension(currentTrack.FilePath);
                                     if (currentTrack.CamelotKey == null) currentTrack.CamelotKey = "";
-                                    allTracks.Add(currentTrack);
+                                    loadedTracks.Add(currentTrack);
                                 }
                             }
                             currentTrack = null;
                         }
                     }
                 }
+                allTracks = loadedTracks;
             }
             catch (Exception ex)
             {
@@ -706,6 +717,7 @@ namespace ArkaiosDJAssistant
                         lblStatus.Text = string.Format("Se encontraron {0} tracks armónicamente compatibles.", finalRecommendations.Count);
 
                         // Iniciar búsqueda asíncrona en YouTube si hay artista
+                        AppendHubTracks();
                         if (automaticOnlineSearchEnabled && !string.IsNullOrEmpty(currentArtist))
                         {
                             string searchArtist = currentArtist;
@@ -765,6 +777,56 @@ namespace ArkaiosDJAssistant
             if (g1Electro && g2Electro) return true;
             
             return false;
+        }
+
+        private void AddTrackToHub(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+            if (!downloadedHubTracks.Any(path => string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase)))
+                downloadedHubTracks.Add(filePath);
+
+            if (isIdle)
+            {
+                isIdle = false;
+                idlePanel.Visible = false;
+                trackList.Visible = true;
+            }
+
+            AppendHubTrack(filePath);
+            lblStatus.Text = "Track descargado en el Hub. Arrástralo desde el final de la lista hacia el plato.";
+        }
+
+        private void RefreshVirtualDjLibrary()
+        {
+            lblStatus.Text = "Actualizando database.xml y motor Camelot...";
+            Task.Run(() =>
+            {
+                LoadDatabase(AppSettings.VdjDatabaseFile);
+                if (IsHandleCreated && !IsDisposed) Invoke(new Action(() =>
+                    lblStatus.Text = string.Format("Biblioteca actualizada: {0} tracks con metadatos de VirtualDJ.", allTracks.Count)));
+            });
+        }
+
+        private void AppendHubTracks()
+        {
+            foreach (string path in downloadedHubTracks.Where(File.Exists)) AppendHubTrack(path);
+        }
+
+        private void AppendHubTrack(string filePath)
+        {
+            foreach (ListViewItem existing in trackList.Items)
+                if (existing.Tag is string && string.Equals((string)existing.Tag, filePath, StringComparison.OrdinalIgnoreCase)) return;
+
+            var item = new ListViewItem("HUB");
+            item.SubItems.Add(Path.GetFileNameWithoutExtension(filePath));
+            item.SubItems.Add("Descarga nueva");
+            item.SubItems.Add("-");
+            item.SubItems.Add("-");
+            item.SubItems.Add(Path.GetFileName(filePath));
+            item.SubItems.Add(Path.GetExtension(filePath).ToLowerInvariant());
+            item.Tag = filePath;
+            item.ForeColor = Color.LightGreen;
+            trackList.Items.Add(item);
         }
 
         private void TrackList_ItemDrag(object sender, ItemDragEventArgs e)
