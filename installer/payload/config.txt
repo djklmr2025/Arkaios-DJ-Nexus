@@ -1,0 +1,8 @@
+
+
+0
+
+show_advanced_tabs=0
+preview_audio_device=Windows default
+youtube_cookies_browser=
+youtube_cookies_file=

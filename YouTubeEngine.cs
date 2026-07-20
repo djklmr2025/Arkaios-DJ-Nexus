@@ -18,8 +18,23 @@ namespace ArkaiosDJAssistant
         public long ViewCount { get; set; }
         public int MaxHeight { get; set; }
         public int MaxAudioKbps { get; set; }
+        public long EstimatedAudioBytes { get; set; }
+        public long EstimatedVideoBytes { get; set; }
         public string AvailableOutputs { get; set; }
-        public string MaximumQuality { get { return MaxHeight > 0 ? MaxHeight + "p / audio " + MaxAudioKbps + " kbps" : "audio " + MaxAudioKbps + " kbps"; } }
+        public bool Downloaded { get; set; }
+        public string DownloadedPath { get; set; }
+        public string PreviewAction { get { return Downloaded ? "Prescuchar" : "Previsualizar"; } }
+        public string HubAction { get { return Downloaded ? "Ver en AutoHelp + Camelot" : "↓ Descargar"; } }
+        public string DownloadState { get { return Downloaded ? "YA DESCARGADA" : "En linea"; } }
+        public string MaximumQualityOverride { get; set; }
+        public string MaximumQuality
+        {
+            get
+            {
+                if (!string.IsNullOrWhiteSpace(MaximumQualityOverride)) return MaximumQualityOverride;
+                return MaxHeight > 0 ? MaxHeight + "p / audio " + MaxAudioKbps + " kbps" : "audio " + MaxAudioKbps + " kbps";
+            }
+        }
     }
 
     public static class YouTubeEngine
@@ -71,6 +86,8 @@ namespace ArkaiosDJAssistant
                     int duration = ToInt(entry, "duration");
                     int maxHeight = 0;
                     int maxAudio = 0;
+                    long audioBytes = 0;
+                    long videoBytes = 0;
                     object formatsObject;
                     if (entry.TryGetValue("formats", out formatsObject))
                     {
@@ -81,6 +98,16 @@ namespace ArkaiosDJAssistant
                             if (format == null) continue;
                             maxHeight = Math.Max(maxHeight, ToInt(format, "height"));
                             maxAudio = Math.Max(maxAudio, ToInt(format, "abr"));
+                            long size = ToLong(format, "filesize");
+                            if (size <= 0) size = ToLong(format, "filesize_approx");
+                            string vcodec = ToString(format, "vcodec");
+                            if (size > 0)
+                            {
+                                if (string.Equals(vcodec, "none", StringComparison.OrdinalIgnoreCase))
+                                    audioBytes = Math.Max(audioBytes, size);
+                                else if (!string.Equals(vcodec, "none", StringComparison.OrdinalIgnoreCase))
+                                    videoBytes = Math.Max(videoBytes, size);
+                            }
                         }
                     }
 
@@ -92,11 +119,82 @@ namespace ArkaiosDJAssistant
                         Title = ToString(entry, "title"), Url = url, Uploader = ToString(entry, "uploader"),
                         Duration = string.Format("{0}:{1:00}", duration / 60, duration % 60),
                         ViewCount = ToLong(entry, "view_count"), MaxHeight = maxHeight, MaxAudioKbps = maxAudio,
+                        EstimatedAudioBytes = audioBytes,
+                        EstimatedVideoBytes = videoBytes > 0 && audioBytes > 0 ? videoBytes + audioBytes : videoBytes,
                         AvailableOutputs = mediaType == "music" ? "MP3 / M4A" : "MP4"
                     });
                 }
             }
             catch (Exception ex) { AppendError("Search JSON: " + ex); }
+            return tracks;
+        }
+
+        public static async Task<List<YouTubeTrack>> SearchSoundCloudAsync(string query, int limit)
+        {
+            var tracks = new List<YouTubeTrack>();
+            if (string.IsNullOrWhiteSpace(query) || !File.Exists(YtDlpPath)) return tracks;
+
+            string search = "scsearch" + Math.Max(1, Math.Min(limit, 20)) + ":" + query;
+            var result = await RunAsync(new[] { "--flat-playlist", "--print", "%(title)s|%(webpage_url)s|%(uploader)s|%(duration_string)s", search });
+            if (result.ExitCode != 0 || string.IsNullOrWhiteSpace(result.Output)) return tracks;
+
+            string[] lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (string line in lines)
+            {
+                string[] parts = line.Split('|');
+                if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[1])) continue;
+                tracks.Add(new YouTubeTrack
+                {
+                    Title = parts[0],
+                    Url = parts[1],
+                    Uploader = parts.Length > 2 ? parts[2] : "SoundCloud",
+                    Duration = parts.Length > 3 ? parts[3] : "-",
+                    MaxHeight = 0,
+                    MaxAudioKbps = 0,
+                    AvailableOutputs = "MP3 / M4A"
+                });
+            }
+            return tracks;
+        }
+
+        public static async Task<List<YouTubeTrack>> ExtractPlaylistFlatAsync(string playlistUrl, int limit)
+        {
+            var tracks = new List<YouTubeTrack>();
+            if (string.IsNullOrWhiteSpace(playlistUrl) || !File.Exists(YtDlpPath)) return tracks;
+
+            var result = await RunAsync(new[] { "--dump-single-json", "--flat-playlist", "--no-warnings", "--playlist-end", Math.Max(1, Math.Min(limit, 50)).ToString(), playlistUrl });
+            if (result.ExitCode != 0 || string.IsNullOrWhiteSpace(result.Output)) return tracks;
+
+            try
+            {
+                var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                var root = serializer.Deserialize<Dictionary<string, object>>(result.Output);
+                object entriesObject;
+                if (root == null || !root.TryGetValue("entries", out entriesObject)) return tracks;
+                var entries = entriesObject as IEnumerable;
+                if (entries == null) return tracks;
+
+                foreach (object entryObject in entries)
+                {
+                    var entry = entryObject as Dictionary<string, object>;
+                    if (entry == null) continue;
+                    string url = ToString(entry, "url");
+                    string id = ToString(entry, "id");
+                    if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase) && id.Length > 0)
+                        url = "https://www.youtube.com/watch?v=" + id;
+                    if (string.IsNullOrWhiteSpace(url)) continue;
+
+                    tracks.Add(new YouTubeTrack
+                    {
+                        Title = ToString(entry, "title"),
+                        Url = url,
+                        Uploader = ToString(entry, "uploader"),
+                        Duration = "-",
+                        AvailableOutputs = "MP3 / M4A / MP4"
+                    });
+                }
+            }
+            catch (Exception ex) { AppendError("Playlist JSON: " + ex); }
             return tracks;
         }
 
@@ -141,17 +239,70 @@ namespace ArkaiosDJAssistant
         {
             return await Task.Run(() =>
             {
-                var psi = new ProcessStartInfo { FileName = YtDlpPath, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
-                psi.Arguments = JoinArguments(args);
-                using (var process = Process.Start(psi))
+                string cookiesFile = AppSettings.YouTubeCookiesFile;
+                if (!string.IsNullOrWhiteSpace(cookiesFile) && File.Exists(cookiesFile))
                 {
-                    string output = process.StandardOutput.ReadToEnd();
-                    string error = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
-                    if (process.ExitCode != 0) AppendError(DateTime.Now + Environment.NewLine + error);
-                    return new ProcessResult { ExitCode = process.ExitCode, Output = output };
+                    ProcessResult withCookieFile = Execute(BuildCookieFileArgs(args, cookiesFile));
+                    if (withCookieFile.ExitCode == 0) return withCookieFile;
+                    AppendError(DateTime.Now + Environment.NewLine + "Fallo usando youtube_cookies_file=" + cookiesFile + Environment.NewLine + withCookieFile.Error);
+                    if (!LooksLikeCookieProblem(withCookieFile.Error)) return withCookieFile;
                 }
+
+                string browser = AppSettings.YouTubeCookiesBrowser;
+                if (!string.IsNullOrWhiteSpace(browser))
+                {
+                    ProcessResult withCookies = Execute(BuildCookieArgs(args, browser));
+                    if (withCookies.ExitCode == 0) return withCookies;
+                    if (!LooksLikeCookieProblem(withCookies.Error)) return withCookies;
+
+                    AppendError(DateTime.Now + Environment.NewLine + "Reintentando sin cookies porque fallo cookies-from-browser " + browser + "." + Environment.NewLine + withCookies.Error);
+                }
+
+                return Execute(args);
             });
+        }
+
+        private static ProcessResult Execute(string[] args)
+        {
+            var psi = new ProcessStartInfo { FileName = YtDlpPath, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
+            psi.Arguments = JoinArguments(args);
+            using (var process = Process.Start(psi))
+            {
+                string output = process.StandardOutput.ReadToEnd();
+                string error = process.StandardError.ReadToEnd();
+                process.WaitForExit();
+                if (process.ExitCode != 0) AppendError(DateTime.Now + Environment.NewLine + error);
+                return new ProcessResult { ExitCode = process.ExitCode, Output = output, Error = error };
+            }
+        }
+
+        private static string[] BuildCookieArgs(string[] args, string browser)
+        {
+            var list = new List<string>();
+            list.Add("--cookies-from-browser");
+            list.Add(browser.Trim());
+            list.AddRange(args);
+            return list.ToArray();
+        }
+
+        private static string[] BuildCookieFileArgs(string[] args, string cookiesFile)
+        {
+            var list = new List<string>();
+            list.Add("--cookies");
+            list.Add(cookiesFile);
+            list.AddRange(args);
+            return list.ToArray();
+        }
+
+        private static bool LooksLikeCookieProblem(string error)
+        {
+            if (string.IsNullOrWhiteSpace(error)) return false;
+            return error.IndexOf("cookie", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("cookies", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("browser", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("chrome", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("edge", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("firefox", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static string ToString(Dictionary<string, object> value, string key) { object raw; return value.TryGetValue(key, out raw) && raw != null ? raw.ToString() : ""; }
@@ -168,6 +319,6 @@ namespace ArkaiosDJAssistant
             }
             return joined.ToString();
         }
-        private class ProcessResult { public int ExitCode; public string Output; }
+        private class ProcessResult { public int ExitCode; public string Output; public string Error; }
     }
 }

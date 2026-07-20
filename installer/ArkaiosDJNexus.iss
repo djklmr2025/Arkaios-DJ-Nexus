@@ -1,5 +1,5 @@
 #define AppName "Arkaios DJ Nexus"
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 #define AppPublisher "Arkaios"
 #define AppExeName "ArkaiosDJ.exe"
 
@@ -30,9 +30,9 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"; Flags: unchecked
 
 [Files]
-Source: "..\ArkaiosDJ.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\yt-dlp.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\config.txt"; DestDir: "{app}"; Flags: onlyifdoesntexist
+Source: "payload\ArkaiosDJ.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "payload\yt-dlp.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "payload\config.txt"; DestDir: "{app}"; Flags: onlyifdoesntexist
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"

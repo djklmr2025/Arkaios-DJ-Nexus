@@ -121,6 +121,15 @@ namespace ArkaiosDJAssistant
         private readonly bool automaticOnlineSearchEnabled = false;
         private readonly List<string> downloadedHubTracks = new List<string>();
         private DownloadHubControl downloadHub;
+        private TabControl mainTabs;
+        private TabPage assistantTab;
+        private TabPage allTracksTab;
+        private TabPage mediaTab;
+        private TabPage hitsTab;
+        private TabPage hubTab;
+        private TabPage organizerTab;
+        private int trackSortColumn = 0;
+        private bool trackSortAscending = true;
 
         public MainForm()
         {
@@ -139,21 +148,30 @@ namespace ArkaiosDJAssistant
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var tabs = new TabControl { Dock = DockStyle.Fill };
-            var assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
-            var mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
-            var hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
+            mainTabs = new TabControl { Dock = DockStyle.Fill };
+            assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
+            allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
+            mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
+            hitsTab = new TabPage("Hits / Plataformas") { BackColor = Color.FromArgb(20, 20, 20) };
+            hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
+            organizerTab = new TabPage("Organizador IA / Renombrador") { BackColor = Color.FromArgb(20, 20, 20) };
             assistantTab.Controls.Add(mainPanel);
+            var allTracksControl = new AllTracksSearchControl();
+            allTracksControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            allTracksTab.Controls.Add(allTracksControl);
             var mediaSearch = new MediaSearchControl();
-            mediaSearch.TrackSentToHub += path => { AddTrackToHub(path); downloadHub.AddDownloadedFile(path); };
+            mediaSearch.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            mediaSearch.TrackViewRequested += path => AddTrackToHub(path, true);
             mediaTab.Controls.Add(mediaSearch);
+            var hitsControl = new HitsTracksControl();
+            hitsControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            hitsTab.Controls.Add(hitsControl);
             downloadHub = new DownloadHubControl();
             downloadHub.RefreshLibraryRequested += RefreshVirtualDjLibrary;
             hubTab.Controls.Add(downloadHub);
-            tabs.TabPages.Add(assistantTab);
-            tabs.TabPages.Add(mediaTab);
-            tabs.TabPages.Add(hubTab);
-            this.Controls.Add(tabs);
+            organizerTab.Controls.Add(new OrganizerControl());
+            ApplyTabVisibility();
+            this.Controls.Add(mainTabs);
 
             lblNowPlaying = new Label
             {
@@ -211,6 +229,7 @@ namespace ArkaiosDJAssistant
             var colKey = trackList.Columns.Add("Key", 60);
             var colFileName = trackList.Columns.Add("File Name", 200);
             var colFileType = trackList.Columns.Add("Type", 60);
+            trackList.ColumnClick += (s, ev) => SortTrackListByColumn(ev.Column);
 
             // Menú contextual para ocultar/mostrar columnas
             columnMenu = new ContextMenuStrip();
@@ -231,6 +250,7 @@ namespace ArkaiosDJAssistant
                 columnMenu.Items.Add(item);
             }
             trackList.ContextMenuStrip = columnMenu;
+            downloadedHubTracks.AddRange(DownloadRegistry.ExistingPaths());
 
             // OwnerDraw for colored stars
             trackList.OwnerDraw = true;
@@ -300,6 +320,9 @@ namespace ArkaiosDJAssistant
                     }
                     else if (tagStr != null && tagStr.StartsWith("MISSING:"))
                     {
+                        await DownloadMissingRecommendationAsync(item, tagStr.Substring(8));
+                        if (DateTime.Now.Ticks < 0)
+                        {
                         string query = tagStr.Substring(8);
                         item.Text = "🔍"; // Buscando
                         item.ForeColor = Color.Orange;
@@ -331,6 +354,7 @@ namespace ArkaiosDJAssistant
                             item.Text = "❌";
                             item.ForeColor = Color.Red;
                             MessageBox.Show("No se encontró el track en YouTube.", "No encontrado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
                         }
                     }
                 }
@@ -429,6 +453,7 @@ namespace ArkaiosDJAssistant
 
         private void ApplySettings()
         {
+            ApplyTabVisibility();
             if (AppSettings.EnableTransparency)
             {
                 this.Opacity = this.ClientRectangle.Contains(this.PointToClient(Cursor.Position)) ? 1.0 : 0.7;
@@ -439,6 +464,24 @@ namespace ArkaiosDJAssistant
             }
             // Recargar DB con nuevos filtros si es necesario
             Task.Run(() => LoadDatabase(AppSettings.VdjDatabaseFile));
+        }
+
+        private void ApplyTabVisibility()
+        {
+            if (mainTabs == null || assistantTab == null || allTracksTab == null) return;
+            TabPage selected = mainTabs.SelectedTab;
+            mainTabs.TabPages.Clear();
+            mainTabs.TabPages.Add(assistantTab);
+            mainTabs.TabPages.Add(allTracksTab);
+            if (AppSettings.ShowAdvancedTabs)
+            {
+                mainTabs.TabPages.Add(mediaTab);
+                mainTabs.TabPages.Add(hitsTab);
+                mainTabs.TabPages.Add(hubTab);
+                mainTabs.TabPages.Add(organizerTab);
+            }
+            if (selected != null && mainTabs.TabPages.Contains(selected))
+                mainTabs.SelectedTab = selected;
         }
 
         private async void MainForm_Load(object sender, EventArgs e)
@@ -707,8 +750,9 @@ namespace ArkaiosDJAssistant
                             item.SubItems.Add(t.Bpm.ToString("0.00"));
                             item.SubItems.Add(t.CamelotKey ?? "");
                             item.SubItems.Add(t.FileName ?? "");
-                            item.SubItems.Add(exists ? (t.FileType ?? "") : "FALTA");
-                            item.Tag = exists ? t.FilePath : ("MISSING:" + (t.Artist ?? "") + " " + (t.Title ?? ""));
+                            string missingKind = IsVideoExtension(t.FileType) ? "video" : "music";
+                            item.SubItems.Add(exists ? (t.FileType ?? "") : ("FALTA / doble clic descarga " + missingKind));
+                            item.Tag = exists ? t.FilePath : ("MISSING:" + missingKind + "|" + (t.Artist ?? "") + " " + (t.Title ?? ""));
 
                             if (!exists) item.ForeColor = Color.Gray; // Poner todo en gris
 
@@ -781,7 +825,13 @@ namespace ArkaiosDJAssistant
 
         private void AddTrackToHub(string filePath)
         {
+            AddTrackToHub(filePath, true);
+        }
+
+        private void AddTrackToHub(string filePath, bool focusAssistantTab)
+        {
             if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+            DownloadRegistry.Register(filePath, "", Path.GetFileNameWithoutExtension(filePath), "Descarga nueva", Path.GetExtension(filePath).ToLowerInvariant());
             if (!downloadedHubTracks.Any(path => string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase)))
                 downloadedHubTracks.Add(filePath);
 
@@ -792,8 +842,179 @@ namespace ArkaiosDJAssistant
                 trackList.Visible = true;
             }
 
-            AppendHubTrack(filePath);
-            lblStatus.Text = "Track descargado en el Hub. Arrástralo desde el final de la lista hacia el plato.";
+            ListViewItem item = AppendHubTrack(filePath);
+            if (focusAssistantTab && mainTabs != null && mainTabs.TabPages.Count > 0)
+                mainTabs.SelectedIndex = 0;
+            SelectHubTrack(item);
+            lblStatus.Text = "↓ Track descargado en descargas recientes. Arrástralo desde el final de la lista hacia el plato.";
+        }
+
+        private async Task DownloadMissingRecommendationAsync(ListViewItem item, string payload)
+        {
+            string preferredType = "music";
+            string query = payload ?? "";
+            int separator = query.IndexOf('|');
+            if (separator >= 0)
+            {
+                preferredType = query.Substring(0, separator);
+                query = query.Substring(separator + 1);
+            }
+            if (string.IsNullOrWhiteSpace(query)) return;
+
+            string mediaType = AskMissingDownloadType(query, preferredType);
+            if (string.IsNullOrWhiteSpace(mediaType)) return;
+
+            item.Text = "...";
+            item.ForeColor = Color.Orange;
+            lblStatus.Text = "Buscando pista faltante en internet: " + query;
+
+            OperationProgressDialog progress = new OperationProgressDialog("Descargando pista faltante de Auto Help + Camelot");
+            progress.Show(this);
+            try
+            {
+                progress.SetBatchStatus(1, 3, "Buscando en YouTube", query);
+                List<YouTubeTrack> ytTracks = await YouTubeEngine.SearchAsync(query, mediaType, 5);
+                if (ytTracks == null || ytTracks.Count == 0)
+                {
+                    string alternateType = mediaType == "video" ? "music" : "video";
+                    if (!AskTryAlternate(mediaType, alternateType))
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se encontro el formato solicitado. Sigue como FALTA.");
+                        lblStatus.Text = "No se encontro el formato solicitado.";
+                        return;
+                    }
+                    mediaType = alternateType;
+                    progress.SetBatchStatus(1, 3, "Buscando formato alterno en YouTube", query);
+                    ytTracks = await YouTubeEngine.SearchAsync(query, mediaType, 5);
+                    if (ytTracks == null || ytTracks.Count == 0)
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se encontro ni audio ni video.");
+                        lblStatus.Text = "No se encontro ni audio ni video.";
+                        return;
+                    }
+                }
+
+                YouTubeTrack best = ytTracks[0];
+                progress.SetBatchStatus(2, 3, "Descargando", best.Title);
+                string quality = mediaType == "video" ? "1080p estable" : "MP3 320 kbps";
+                string localPath = await YouTubeEngine.DownloadAsync(best.Url, mediaType, quality);
+                if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+                {
+                    string alternateType = mediaType == "video" ? "music" : "video";
+                    if (!AskTryAlternate(mediaType, alternateType))
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se pudo descargar el formato solicitado. Sigue como FALTA.");
+                        lblStatus.Text = "No se pudo descargar el formato solicitado.";
+                        return;
+                    }
+                    mediaType = alternateType;
+                    progress.SetBatchStatus(1, 3, "Buscando formato alterno en YouTube", query);
+                    ytTracks = await YouTubeEngine.SearchAsync(query, mediaType, 5);
+                    if (ytTracks == null || ytTracks.Count == 0)
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se encontro el formato alterno.");
+                        lblStatus.Text = "No se encontro el formato alterno.";
+                        return;
+                    }
+                    best = ytTracks[0];
+                    progress.SetBatchStatus(2, 3, "Descargando formato alterno", best.Title);
+                    quality = mediaType == "video" ? "1080p estable" : "MP3 320 kbps";
+                    localPath = await YouTubeEngine.DownloadAsync(best.Url, mediaType, quality);
+                    if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("Tampoco se pudo descargar el formato alterno.");
+                        lblStatus.Text = "No se pudo descargar ni audio ni video.";
+                        return;
+                    }
+                }
+
+                progress.SetBatchStatus(3, 3, "Registrando en Hub", Path.GetFileName(localPath));
+                DownloadRegistry.Register(localPath, best.Url, best.Title, best.Uploader, mediaType);
+                item.Text = "↓";
+                item.ForeColor = Color.LightGreen;
+                item.SubItems[5].Text = Path.GetFileName(localPath);
+                item.SubItems[6].Text = Path.GetExtension(localPath).ToLowerInvariant();
+                item.Tag = localPath;
+                AddTrackToHub(localPath, true);
+                if (downloadHub != null) downloadHub.AddDownloadedFile(localPath);
+                progress.SetResult("Descargada y agregada como reciente: " + localPath);
+                lblStatus.Text = "Pista faltante descargada, registrada y agregada a descargas recientes.";
+            }
+            finally
+            {
+                System.Threading.Thread.Sleep(500);
+                progress.Close();
+                progress.Dispose();
+            }
+        }
+
+        private string AskMissingDownloadType(string query, string preferredType)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = "Descargar pista faltante";
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.MinimizeBox = false;
+                dialog.MaximizeBox = false;
+                dialog.ClientSize = new Size(480, 175);
+                dialog.BackColor = Color.FromArgb(25, 25, 25);
+                dialog.ForeColor = Color.White;
+
+                var label = new Label
+                {
+                    Text = "VirtualDJ tiene esta metadata, pero falta el archivo fisico:\n\n" + query + "\n\nElige que deseas buscar y descargar:",
+                    Dock = DockStyle.Top,
+                    Height = 100,
+                    Padding = new Padding(12),
+                    ForeColor = Color.White
+                };
+                dialog.Controls.Add(label);
+
+                string selected = null;
+                var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 55, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
+                var cancel = new Button { Text = "Cancelar", Width = 100, Height = 32 };
+                var video = new Button { Text = "Video MP4", Width = 115, Height = 32 };
+                var audio = new Button { Text = "Audio MP3", Width = 115, Height = 32 };
+                cancel.Click += (s, e) => { selected = null; dialog.DialogResult = DialogResult.Cancel; dialog.Close(); };
+                video.Click += (s, e) => { selected = "video"; dialog.DialogResult = DialogResult.OK; dialog.Close(); };
+                audio.Click += (s, e) => { selected = "music"; dialog.DialogResult = DialogResult.OK; dialog.Close(); };
+                buttons.Controls.Add(cancel);
+                buttons.Controls.Add(video);
+                buttons.Controls.Add(audio);
+                dialog.Controls.Add(buttons);
+
+                dialog.Shown += (s, e) => { if (preferredType == "video") video.Focus(); else audio.Focus(); };
+                return dialog.ShowDialog(this) == DialogResult.OK ? selected : null;
+            }
+        }
+
+        private bool AskTryAlternate(string failedType, string alternateType)
+        {
+            string failedLabel = failedType == "video" ? "video MP4" : "audio MP3";
+            string alternateLabel = alternateType == "video" ? "video MP4" : "audio MP3";
+            DialogResult answer = MessageBox.Show(
+                "No se pudo obtener como " + failedLabel + ".\n\nDeseas intentar descargarlo como " + alternateLabel + "?",
+                "Intentar formato alterno",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            return answer == DialogResult.Yes;
+        }
+
+        private static bool IsVideoExtension(string extension)
+        {
+            string ext = (extension ?? "").ToLowerInvariant();
+            return ext == ".mp4" || ext == ".mkv" || ext == ".webm" || ext == ".avi" || ext == ".mov";
         }
 
         private void RefreshVirtualDjLibrary()
@@ -816,21 +1037,89 @@ namespace ArkaiosDJAssistant
             foreach (string path in downloadedHubTracks.Where(File.Exists)) AppendHubTrack(path);
         }
 
-        private void AppendHubTrack(string filePath)
+        private ListViewItem AppendHubTrack(string filePath)
         {
             foreach (ListViewItem existing in trackList.Items)
-                if (existing.Tag is string && string.Equals((string)existing.Tag, filePath, StringComparison.OrdinalIgnoreCase)) return;
+                if (existing.Tag is string && string.Equals((string)existing.Tag, filePath, StringComparison.OrdinalIgnoreCase)) return existing;
 
-            var item = new ListViewItem("HUB");
+            EnsureHubSeparator();
+            var item = new ListViewItem("↓");
             item.SubItems.Add(Path.GetFileNameWithoutExtension(filePath));
-            item.SubItems.Add("Descarga nueva");
+            item.SubItems.Add("Descarga reciente");
             item.SubItems.Add("-");
             item.SubItems.Add("-");
             item.SubItems.Add(Path.GetFileName(filePath));
             item.SubItems.Add(Path.GetExtension(filePath).ToLowerInvariant());
             item.Tag = filePath;
+            item.BackColor = Color.FromArgb(24, 65, 36);
             item.ForeColor = Color.LightGreen;
             trackList.Items.Add(item);
+            return item;
+        }
+
+        private void EnsureHubSeparator()
+        {
+            foreach (ListViewItem existing in trackList.Items)
+                if (existing.Tag is string && string.Equals((string)existing.Tag, "ARKAIOS_DOWNLOAD_SEPARATOR", StringComparison.OrdinalIgnoreCase)) return;
+
+            var separator = new ListViewItem("↓");
+            separator.SubItems.Add("DESCARGAS RECIENTES / HUB LOCAL");
+            separator.SubItems.Add("Separador");
+            separator.SubItems.Add("");
+            separator.SubItems.Add("");
+            separator.SubItems.Add("Arrastra las pistas de abajo al plato");
+            separator.SubItems.Add("");
+            separator.Tag = "ARKAIOS_DOWNLOAD_SEPARATOR";
+            separator.BackColor = Color.FromArgb(12, 90, 42);
+            separator.ForeColor = Color.White;
+            trackList.Items.Add(separator);
+        }
+
+        private void SelectHubTrack(ListViewItem item)
+        {
+            if (item == null) return;
+            trackList.SelectedItems.Clear();
+            item.Selected = true;
+            item.Focused = true;
+            item.EnsureVisible();
+            trackList.Focus();
+        }
+
+        private void SortTrackListByColumn(int column)
+        {
+            if (trackSortColumn == column) trackSortAscending = !trackSortAscending;
+            else
+            {
+                trackSortColumn = column;
+                trackSortAscending = true;
+            }
+
+            var items = trackList.Items.Cast<ListViewItem>().ToList();
+            items.Sort((a, b) =>
+            {
+                int value;
+                if (column == 3) value = ParseListDouble(a, column).CompareTo(ParseListDouble(b, column));
+                else value = string.Compare(GetListText(a, column), GetListText(b, column), StringComparison.OrdinalIgnoreCase);
+                return trackSortAscending ? value : -value;
+            });
+
+            trackList.BeginUpdate();
+            trackList.Items.Clear();
+            trackList.Items.AddRange(items.ToArray());
+            trackList.EndUpdate();
+            lblStatus.Text = "Lista ordenada por " + trackList.Columns[column].Text + ".";
+        }
+
+        private static string GetListText(ListViewItem item, int column)
+        {
+            if (column < item.SubItems.Count) return item.SubItems[column].Text ?? "";
+            return "";
+        }
+
+        private static double ParseListDouble(ListViewItem item, int column)
+        {
+            double parsed;
+            return double.TryParse(GetListText(item, column), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) ? parsed : 0;
         }
 
         private void TrackList_ItemDrag(object sender, ItemDragEventArgs e)
@@ -838,14 +1127,16 @@ namespace ArkaiosDJAssistant
             var selectedItems = trackList.SelectedItems;
             if (selectedItems.Count > 0)
             {
-                string[] files = new string[selectedItems.Count];
+                var fileList = new List<string>();
                 for (int i = 0; i < selectedItems.Count; i++)
                 {
-                    files[i] = selectedItems[i].Tag.ToString();
+                    string path = selectedItems[i].Tag == null ? "" : selectedItems[i].Tag.ToString();
+                    if (File.Exists(path)) fileList.Add(path);
                 }
+                if (fileList.Count == 0) return;
 
                 // Generar un DataObject con el arreglo de archivos (CF_HDROP = FileDrop)
-                DataObject data = new DataObject(DataFormats.FileDrop, files);
+                DataObject data = new DataObject(DataFormats.FileDrop, fileList.ToArray());
                 
                 // Iniciar la operación de arrastrar y soltar de forma nativa (Win32 compatible)
                 trackList.DoDragDrop(data, DragDropEffects.Copy);

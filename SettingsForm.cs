@@ -9,6 +9,8 @@ namespace ArkaiosDJAssistant
     {
         private TabControl tabControl;
         private CheckBox chkTransparency;
+        private CheckBox chkAdvancedTabs;
+        private ComboBox cboAudioDevice;
         private TextBox txtVdjExe;
         private ListBox lstFolders;
 
@@ -60,6 +62,60 @@ namespace ArkaiosDJAssistant
                 }
             };
             tabGeneral.Controls.Add(btnBrowseExe);
+
+            // Options Tab
+            TabPage tabOptions = new TabPage("Opciones") { BackColor = Color.FromArgb(30, 30, 30) };
+            tabControl.TabPages.Add(tabOptions);
+
+            Label lblOptionsTitle = new Label { Text = "Interfaz", Font = new Font("Segoe UI", 12, FontStyle.Bold), Location = new Point(20, 20), AutoSize = true };
+            tabOptions.Controls.Add(lblOptionsTitle);
+
+            chkAdvancedTabs = new CheckBox
+            {
+                Text = "Modo avanzado\nMuestra Buscar y descargar, Hits / Plataformas, Descargas / Hub local y Organizador IA.",
+                Location = new Point(20, 60),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 10),
+                ForeColor = Color.LightGray,
+                Checked = AppSettings.ShowAdvancedTabs
+            };
+            tabOptions.Controls.Add(chkAdvancedTabs);
+
+            Label lblAudioTitle = new Label { Text = "Salida de audio para preview local", Font = new Font("Segoe UI", 10, FontStyle.Bold), Location = new Point(20, 135), AutoSize = true };
+            tabOptions.Controls.Add(lblAudioTitle);
+
+            cboAudioDevice = new ComboBox
+            {
+                Location = new Point(20, 165),
+                Width = 420,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 10)
+            };
+            foreach (string device in AudioDeviceCatalog.GetOutputDevices())
+                cboAudioDevice.Items.Add(device);
+            string selectedAudio = string.IsNullOrWhiteSpace(AppSettings.PreviewAudioDevice) ? AudioDeviceCatalog.DefaultDevice : AppSettings.PreviewAudioDevice;
+            int selectedIndex = cboAudioDevice.FindStringExact(selectedAudio);
+            if (selectedIndex < 0)
+            {
+                cboAudioDevice.Items.Add(selectedAudio);
+                selectedIndex = cboAudioDevice.Items.Count - 1;
+            }
+            cboAudioDevice.SelectedIndex = Math.Max(0, selectedIndex);
+            tabOptions.Controls.Add(cboAudioDevice);
+
+            string vdjDevice = AudioDeviceCatalog.GetVirtualDjHeadphoneDevice();
+            Label lblAudioNote = new Label
+            {
+                Text = "Detectado VDJ audifonos: " + (string.IsNullOrWhiteSpace(vdjDevice) ? "no detectado" : vdjDevice) + "\nNota: el motor liviano usa Windows default si el reproductor interno no permite ruteo directo.",
+                Location = new Point(20, 200),
+                Width = 520,
+                Height = 60,
+                ForeColor = Color.LightGray,
+                Font = new Font("Segoe UI", 8)
+            };
+            tabOptions.Controls.Add(lblAudioNote);
 
             // Library Tab
             TabPage tabLibrary = new TabPage("Library") { BackColor = Color.FromArgb(30, 30, 30) };
@@ -126,6 +182,8 @@ namespace ArkaiosDJAssistant
         private void BtnSave_Click(object sender, EventArgs e)
         {
             AppSettings.EnableTransparency = chkTransparency.Checked;
+            AppSettings.ShowAdvancedTabs = chkAdvancedTabs.Checked;
+            AppSettings.PreviewAudioDevice = cboAudioDevice.SelectedItem == null ? AudioDeviceCatalog.DefaultDevice : cboAudioDevice.SelectedItem.ToString();
             AppSettings.VdjExecutableFile = txtVdjExe.Text;
             AppSettings.AllowedFolders.Clear();
             foreach (var item in lstFolders.Items)
