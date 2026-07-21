@@ -49,7 +49,7 @@ namespace ArkaiosDJAssistant
             if (string.IsNullOrEmpty(rawKey)) return "";
             string camelot;
             if (KeyToCamelot.TryGetValue(rawKey, out camelot)) return camelot;
-            
+
             // Si ya es un valor Camelot (ej: 8A), regresarlo directo
             if (rawKey.Length >= 2 && char.IsDigit(rawKey[0]) && (rawKey.EndsWith("A", StringComparison.OrdinalIgnoreCase) || rawKey.EndsWith("B", StringComparison.OrdinalIgnoreCase)))
             {
@@ -118,6 +118,18 @@ namespace ArkaiosDJAssistant
         private Button btnSettings;
         private bool isIdle = true;
         private double baseOpacity = 1.0;
+        private readonly bool automaticOnlineSearchEnabled = false;
+        private readonly List<string> downloadedHubTracks = new List<string>();
+        private DownloadHubControl downloadHub;
+        private TabControl mainTabs;
+        private TabPage assistantTab;
+        private TabPage allTracksTab;
+        private TabPage mediaTab;
+        private TabPage hitsTab;
+        private TabPage hubTab;
+        private TabPage organizerTab;
+        private int trackSortColumn = 0;
+        private bool trackSortAscending = true;
 
         public MainForm()
         {
@@ -136,7 +148,30 @@ namespace ArkaiosDJAssistant
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            this.Controls.Add(mainPanel);
+            mainTabs = new TabControl { Dock = DockStyle.Fill };
+            assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
+            allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
+            mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
+            hitsTab = new TabPage("Hits / Plataformas") { BackColor = Color.FromArgb(20, 20, 20) };
+            hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
+            organizerTab = new TabPage("Organizador IA / Renombrador") { BackColor = Color.FromArgb(20, 20, 20) };
+            assistantTab.Controls.Add(mainPanel);
+            var allTracksControl = new AllTracksSearchControl();
+            allTracksControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            allTracksTab.Controls.Add(allTracksControl);
+            var mediaSearch = new MediaSearchControl();
+            mediaSearch.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            mediaSearch.TrackViewRequested += path => AddTrackToHub(path, true);
+            mediaTab.Controls.Add(mediaSearch);
+            var hitsControl = new HitsTracksControl();
+            hitsControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            hitsTab.Controls.Add(hitsControl);
+            downloadHub = new DownloadHubControl();
+            downloadHub.RefreshLibraryRequested += RefreshVirtualDjLibrary;
+            hubTab.Controls.Add(downloadHub);
+            organizerTab.Controls.Add(new OrganizerControl());
+            ApplyTabVisibility();
+            this.Controls.Add(mainTabs);
 
             lblNowPlaying = new Label
             {
@@ -194,6 +229,7 @@ namespace ArkaiosDJAssistant
             var colKey = trackList.Columns.Add("Key", 60);
             var colFileName = trackList.Columns.Add("File Name", 200);
             var colFileType = trackList.Columns.Add("Type", 60);
+            trackList.ColumnClick += (s, ev) => SortTrackListByColumn(ev.Column);
 
             // Menú contextual para ocultar/mostrar columnas
             columnMenu = new ContextMenuStrip();
@@ -214,6 +250,7 @@ namespace ArkaiosDJAssistant
                 columnMenu.Items.Add(item);
             }
             trackList.ContextMenuStrip = columnMenu;
+            downloadedHubTracks.AddRange(DownloadRegistry.ExistingPaths());
 
             // OwnerDraw for colored stars
             trackList.OwnerDraw = true;
@@ -283,6 +320,9 @@ namespace ArkaiosDJAssistant
                     }
                     else if (tagStr != null && tagStr.StartsWith("MISSING:"))
                     {
+                        await DownloadMissingRecommendationAsync(item, tagStr.Substring(8));
+                        if (DateTime.Now.Ticks < 0)
+                        {
                         string query = tagStr.Substring(8);
                         item.Text = "🔍"; // Buscando
                         item.ForeColor = Color.Orange;
@@ -314,6 +354,7 @@ namespace ArkaiosDJAssistant
                             item.Text = "❌";
                             item.ForeColor = Color.Red;
                             MessageBox.Show("No se encontró el track en YouTube.", "No encontrado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }
                         }
                     }
                 }
@@ -412,6 +453,7 @@ namespace ArkaiosDJAssistant
 
         private void ApplySettings()
         {
+            ApplyTabVisibility();
             if (AppSettings.EnableTransparency)
             {
                 this.Opacity = this.ClientRectangle.Contains(this.PointToClient(Cursor.Position)) ? 1.0 : 0.7;
@@ -422,6 +464,24 @@ namespace ArkaiosDJAssistant
             }
             // Recargar DB con nuevos filtros si es necesario
             Task.Run(() => LoadDatabase(AppSettings.VdjDatabaseFile));
+        }
+
+        private void ApplyTabVisibility()
+        {
+            if (mainTabs == null || assistantTab == null || allTracksTab == null) return;
+            TabPage selected = mainTabs.SelectedTab;
+            mainTabs.TabPages.Clear();
+            mainTabs.TabPages.Add(assistantTab);
+            mainTabs.TabPages.Add(allTracksTab);
+            if (AppSettings.ShowAdvancedTabs)
+            {
+                mainTabs.TabPages.Add(mediaTab);
+                mainTabs.TabPages.Add(hitsTab);
+                mainTabs.TabPages.Add(hubTab);
+                mainTabs.TabPages.Add(organizerTab);
+            }
+            if (selected != null && mainTabs.TabPages.Contains(selected))
+                mainTabs.SelectedTab = selected;
         }
 
         private async void MainForm_Load(object sender, EventArgs e)
@@ -449,6 +509,7 @@ namespace ArkaiosDJAssistant
         {
             try
             {
+                var loadedTracks = new List<Track>();
                 using (FileStream fs = new FileStream(xmlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 using (XmlReader reader = XmlReader.Create(fs))
                 {
@@ -499,13 +560,14 @@ namespace ArkaiosDJAssistant
                                     currentTrack.FileType = Path.GetExtension(currentTrack.FilePath).ToLower();
                                     if (string.IsNullOrEmpty(currentTrack.Title)) currentTrack.Title = Path.GetFileNameWithoutExtension(currentTrack.FilePath);
                                     if (currentTrack.CamelotKey == null) currentTrack.CamelotKey = "";
-                                    allTracks.Add(currentTrack);
+                                    loadedTracks.Add(currentTrack);
                                 }
                             }
                             currentTrack = null;
                         }
                     }
                 }
+                allTracks = loadedTracks;
             }
             catch (Exception ex)
             {
@@ -564,169 +626,179 @@ namespace ArkaiosDJAssistant
 
         private void UpdateRecommendations(string filePath)
         {
-            if (this.InvokeRequired)
+            Task.Run(() =>
             {
-                this.Invoke(new Action(() => UpdateRecommendations(filePath)));
-                return;
-            }
-
-            var playingTrack = allTracks.FirstOrDefault(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
-            if (playingTrack == null)
-            {
-                // Fallback: buscar por el puro nombre del archivo (útil si VDJ cambió la ruta o la unidad)
-                string fileName = Path.GetFileName(filePath);
-                playingTrack = allTracks.FirstOrDefault(t => string.Equals(Path.GetFileName(t.FilePath), fileName, StringComparison.OrdinalIgnoreCase));
-            }
-
-            if (playingTrack == null)
-            {
-                lblNowPlaying.Text = "No se encontró metadata en DB para:\n" + Path.GetFileName(filePath);
-                return;
-            }
-
-            lblNowPlaying.Text = string.Format("SONANDO: {0} - {1}\nBPM: {2} | Key: {3} ({4})", playingTrack.Title, playingTrack.Artist, playingTrack.Bpm, playingTrack.CamelotKey, playingTrack.Key);
-
-            var distinctTracks = allTracks
-                .Where(t => t.FilePath != playingTrack.FilePath)
-                .GroupBy(t => (t.Artist ?? "") + "|" + (t.Title ?? ""))
-                .Select(g => g.First())
-                .ToList();
-
-            List<Track> gold = new List<Track>();
-            List<Track> silver = new List<Track>();
-            List<Track> bronze = new List<Track>();
-            List<Track> compatible = new List<Track>();
-            List<Track> sameArtist = new List<Track>();
-
-            string currentArtist = playingTrack.Artist ?? "";
-
-            foreach (var t in distinctTracks)
-            {
-                double currentBpm = playingTrack.Bpm;
-                double targetBpm = t.Bpm;
-
-                bool bpmMatch = Math.Abs(currentBpm - targetBpm) <= (currentBpm * 0.04) ||
-                                Math.Abs((currentBpm * 2) - targetBpm) <= ((currentBpm * 2) * 0.04) ||
-                                Math.Abs((currentBpm / 2) - targetBpm) <= ((currentBpm / 2) * 0.04);
-
-                if (bpmMatch)
+                var playingTrack = allTracks.FirstOrDefault(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+                if (playingTrack == null)
                 {
-                    int camelotScore = HarmonicEngine.CalculateCamelotScore(playingTrack.CamelotKey, t.CamelotKey);
-                    bool historyMatch = HistoryEngine.HasHistoricalTransition(playingTrack.FilePath, t.FilePath);
-
-                    if (historyMatch) { t.RankIcon = "GOLD"; t.MatchScore = 100 + camelotScore; gold.Add(t); }
-                    else if (camelotScore >= 3) { t.RankIcon = "SILVER"; t.MatchScore = camelotScore; silver.Add(t); }
-                    else if (camelotScore == 2) { t.RankIcon = "BRONZE"; t.MatchScore = camelotScore; bronze.Add(t); }
-                    else if (camelotScore == 1 || bpmMatch) { t.RankIcon = ""; t.MatchScore = camelotScore; compatible.Add(t); }
+                    // Fallback: buscar por el puro nombre del archivo (útil si VDJ cambió la ruta o la unidad)
+                    string fileName = Path.GetFileName(filePath);
+                    playingTrack = allTracks.FirstOrDefault(t => string.Equals(Path.GetFileName(t.FilePath), fileName, StringComparison.OrdinalIgnoreCase));
                 }
-                else if (!string.IsNullOrEmpty(currentArtist) && string.Equals(t.Artist, currentArtist, StringComparison.OrdinalIgnoreCase))
+
+                if (playingTrack == null)
                 {
-                    t.RankIcon = "";
-                    t.MatchScore = 0;
-                    sameArtist.Add(t);
-                }
-            }
-
-            gold = gold.OrderByDescending(t => t.MatchScore).Take(3).ToList();
-            silver = silver.OrderByDescending(t => t.MatchScore).Take(2).ToList();
-            bronze = bronze.OrderByDescending(t => t.MatchScore).Take(2).ToList();
-            
-            // Llenar compatibles
-            int neededFor20 = 20 - (gold.Count + silver.Count + bronze.Count);
-            compatible = compatible.OrderByDescending(t => t.MatchScore).Take(Math.Max(0, neededFor20)).ToList();
-
-            // Mismo Artista
-            int neededForArtist = 5;
-            sameArtist = sameArtist.Take(neededForArtist).ToList();
-            
-            // Rellenar si faltan para 25
-            int totalSoFar = gold.Count + silver.Count + bronze.Count + compatible.Count + sameArtist.Count;
-            if (totalSoFar < 25) {
-                var extraCompatible = distinctTracks.Except(gold).Except(silver).Except(bronze).Except(compatible).Except(sameArtist)
-                                        .Where(t => t.Bpm > 0 && Math.Abs(playingTrack.Bpm - t.Bpm) <= (playingTrack.Bpm * 0.04))
-                                        .Take(25 - totalSoFar).ToList();
-                compatible.AddRange(extraCompatible);
-            }
-
-            List<Track> finalRecommendations = new List<Track>();
-            finalRecommendations.AddRange(gold);
-            finalRecommendations.AddRange(silver);
-            finalRecommendations.AddRange(bronze);
-            finalRecommendations.AddRange(compatible);
-            finalRecommendations.AddRange(sameArtist);
-
-            // Orden final estricto: 1. BPM, 2. Genero, 3. Camelot
-            finalRecommendations = finalRecommendations
-                .OrderBy(t => Math.Abs(playingTrack.Bpm - t.Bpm))
-                .ThenByDescending(t => IsSameGenreFamily(playingTrack.Genre, t.Genre) ? 1 : 0)
-                .ThenByDescending(t => t.MatchScore)
-                .ToList();
-
-            if (isIdle) {
-                isIdle = false;
-                idlePanel.Visible = false;
-                trackList.Visible = true;
-            }
-            
-            trackList.Items.Clear();
-            foreach (var t in finalRecommendations.Take(25))
-            {
-                bool exists = File.Exists(t.FilePath);
-                
-                // TODO [NUBE]: Implementar para estas canciones faltantes (☁) el servidor de descarga remoto / validador en tiempo real.
-                // TODO [NUBE]: El motor de las 5 canciones del mismo artista tambiÃ©n debe migrar a validaciÃ³n por API del servidor en lÃ­nea.
-                // TODO [NUBE]: Integrar API de Spotify/Amazon Music para inyectar "Top Tracks" mundiales como recomendaciones de descarga.
-
-                var item = new ListViewItem(exists ? (t.RankIcon ?? "") : "☁"); // Icono de Nube (soporte WinForms)
-                item.SubItems.Add(t.Title ?? "");
-                item.SubItems.Add(t.Artist ?? "");
-                item.SubItems.Add(t.Bpm.ToString("0.00"));
-                item.SubItems.Add(t.CamelotKey ?? "");
-                item.SubItems.Add(t.FileName ?? "");
-                item.SubItems.Add(exists ? (t.FileType ?? "") : "FALTA");
-                item.Tag = exists ? t.FilePath : ("MISSING:" + (t.Artist ?? "") + " " + (t.Title ?? ""));
-                
-                if (!exists) item.ForeColor = Color.Gray; // Poner todo en gris
-                
-                trackList.Items.Add(item);
-            }
-            lblStatus.Text = string.Format("Se encontraron {0} tracks armónicamente compatibles.", finalRecommendations.Count);
-
-            // Iniciar búsqueda asíncrona en YouTube si hay artista
-            if (!string.IsNullOrEmpty(currentArtist))
-            {
-                string searchArtist = currentArtist;
-                Task.Run(async () =>
-                {
-                    var ytTracks = await YouTubeEngine.SearchArtistAsync(searchArtist);
-                    if (ytTracks != null && ytTracks.Count > 0)
+                    if (this.IsHandleCreated && !this.IsDisposed)
                     {
-                        if (this.IsHandleCreated && !this.IsDisposed)
-                        {
-                            this.Invoke(new Action(() => {
-                                // Verificar que no haya cambiado la pista actual mientras buscábamos
-                                if (lblNowPlaying.Text.Contains(searchArtist))
-                                {
-                                    foreach (var yt in ytTracks)
-                                    {
-                                        var item = new ListViewItem("🌐");
-                                        item.SubItems.Add(yt.Title);
-                                        item.SubItems.Add(searchArtist);
-                                        item.SubItems.Add("YT"); // BPM placeholder
-                                        item.SubItems.Add("-"); // Key placeholder
-                                        item.SubItems.Add("YouTube: " + yt.Duration);
-                                        item.SubItems.Add("yt");
-                                        item.Tag = "YOUTUBE:" + yt.Url;
-                                        item.ForeColor = Color.LightSkyBlue;
-                                        trackList.Items.Add(item);
-                                    }
-                                    lblStatus.Text += string.Format(" (+{0} tracks en YouTube listos para descargar)", ytTracks.Count);
-                                }
-                            }));
-                        }
+                        this.Invoke(new Action(() => {
+                            lblNowPlaying.Text = "No se encontró metadata en DB para:\n" + Path.GetFileName(filePath);
+                        }));
                     }
-                });
-            }
+                    return;
+                }
+
+                var distinctTracks = allTracks
+                    .Where(t => t.FilePath != playingTrack.FilePath)
+                    .GroupBy(t => (t.Artist ?? "") + "|" + (t.Title ?? ""))
+                    .Select(g => g.First())
+                    .ToList();
+
+                List<Track> gold = new List<Track>();
+                List<Track> silver = new List<Track>();
+                List<Track> bronze = new List<Track>();
+                List<Track> compatible = new List<Track>();
+                List<Track> sameArtist = new List<Track>();
+
+                string currentArtist = playingTrack.Artist ?? "";
+
+                foreach (var t in distinctTracks)
+                {
+                    double currentBpm = playingTrack.Bpm;
+                    double targetBpm = t.Bpm;
+
+                    bool bpmMatch = Math.Abs(currentBpm - targetBpm) <= (currentBpm * 0.04) ||
+                                    Math.Abs((currentBpm * 2) - targetBpm) <= ((currentBpm * 2) * 0.04) ||
+                                    Math.Abs((currentBpm / 2) - targetBpm) <= ((currentBpm / 2) * 0.04);
+
+                    if (bpmMatch)
+                    {
+                        int camelotScore = HarmonicEngine.CalculateCamelotScore(playingTrack.CamelotKey, t.CamelotKey);
+                        bool historyMatch = HistoryEngine.HasHistoricalTransition(playingTrack.FilePath, t.FilePath);
+
+                        if (historyMatch) { t.RankIcon = "GOLD"; t.MatchScore = 100 + camelotScore; gold.Add(t); }
+                        else if (camelotScore >= 3) { t.RankIcon = "SILVER"; t.MatchScore = camelotScore; silver.Add(t); }
+                        else if (camelotScore == 2) { t.RankIcon = "BRONZE"; t.MatchScore = camelotScore; bronze.Add(t); }
+                        else if (camelotScore == 1 || bpmMatch) { t.RankIcon = ""; t.MatchScore = camelotScore; compatible.Add(t); }
+                    }
+                    else if (!string.IsNullOrEmpty(currentArtist) && string.Equals(t.Artist, currentArtist, StringComparison.OrdinalIgnoreCase))
+                    {
+                        t.RankIcon = "";
+                        t.MatchScore = 0;
+                        sameArtist.Add(t);
+                    }
+                }
+
+                gold = gold.OrderByDescending(t => t.MatchScore).Take(3).ToList();
+                silver = silver.OrderByDescending(t => t.MatchScore).Take(2).ToList();
+                bronze = bronze.OrderByDescending(t => t.MatchScore).Take(2).ToList();
+
+                // Llenar compatibles
+                int neededFor20 = 20 - (gold.Count + silver.Count + bronze.Count);
+                compatible = compatible.OrderByDescending(t => t.MatchScore).Take(Math.Max(0, neededFor20)).ToList();
+
+                // Mismo Artista
+                int neededForArtist = 5;
+                sameArtist = sameArtist.Take(neededForArtist).ToList();
+
+                // Rellenar si faltan para 25
+                int totalSoFar = gold.Count + silver.Count + bronze.Count + compatible.Count + sameArtist.Count;
+                if (totalSoFar < 25) {
+                    var extraCompatible = distinctTracks.Except(gold).Except(silver).Except(bronze).Except(compatible).Except(sameArtist)
+                                            .Where(t => t.Bpm > 0 && Math.Abs(playingTrack.Bpm - t.Bpm) <= (playingTrack.Bpm * 0.04))
+                                            .Take(25 - totalSoFar).ToList();
+                    compatible.AddRange(extraCompatible);
+                }
+
+                List<Track> finalRecommendations = new List<Track>();
+                finalRecommendations.AddRange(gold);
+                finalRecommendations.AddRange(silver);
+                finalRecommendations.AddRange(bronze);
+                finalRecommendations.AddRange(compatible);
+                finalRecommendations.AddRange(sameArtist);
+
+                // Orden final estricto: 1. BPM, 2. Genero, 3. Camelot
+                finalRecommendations = finalRecommendations
+                    .OrderBy(t => Math.Abs(playingTrack.Bpm - t.Bpm))
+                    .ThenByDescending(t => IsSameGenreFamily(playingTrack.Genre, t.Genre) ? 1 : 0)
+                    .ThenByDescending(t => t.MatchScore)
+                    .ToList();
+
+                if (this.IsHandleCreated && !this.IsDisposed)
+                {
+                    this.Invoke(new Action(() =>
+                    {
+                        lblNowPlaying.Text = string.Format("SONANDO: {0} - {1}\nBPM: {2} | Key: {3} ({4})", playingTrack.Title, playingTrack.Artist, playingTrack.Bpm, playingTrack.CamelotKey, playingTrack.Key);
+
+                        if (isIdle) {
+                            isIdle = false;
+                            idlePanel.Visible = false;
+                            trackList.Visible = true;
+                        }
+
+                        trackList.Items.Clear();
+                        foreach (var t in finalRecommendations.Take(25))
+                        {
+                            bool exists = File.Exists(t.FilePath);
+
+                            // TODO [NUBE]: Implementar para estas canciones faltantes (☁) el servidor de descarga remoto / validador en tiempo real.
+                            // TODO [NUBE]: El motor de las 5 canciones del mismo artista tambiÃ©n debe migrar a validaciÃ³n por API del servidor en lÃ­nea.
+                            // TODO [NUBE]: Integrar API de Spotify/Amazon Music para inyectar "Top Tracks" mundiales como recomendaciones de descarga.
+
+                            var item = new ListViewItem(exists ? (t.RankIcon ?? "") : "☁"); // Icono de Nube (soporte WinForms)
+                            item.SubItems.Add(t.Title ?? "");
+                            item.SubItems.Add(t.Artist ?? "");
+                            item.SubItems.Add(t.Bpm.ToString("0.00"));
+                            item.SubItems.Add(t.CamelotKey ?? "");
+                            item.SubItems.Add(t.FileName ?? "");
+                            string missingKind = IsVideoExtension(t.FileType) ? "video" : "music";
+                            item.SubItems.Add(exists ? (t.FileType ?? "") : ("FALTA / doble clic descarga " + missingKind));
+                            item.Tag = exists ? t.FilePath : ("MISSING:" + missingKind + "|" + (t.Artist ?? "") + " " + (t.Title ?? ""));
+
+                            if (!exists) item.ForeColor = Color.Gray; // Poner todo en gris
+
+                            trackList.Items.Add(item);
+                        }
+                        lblStatus.Text = string.Format("Se encontraron {0} tracks armónicamente compatibles.", finalRecommendations.Count);
+
+                        // Iniciar búsqueda asíncrona en YouTube si hay artista
+                        AppendHubTracks();
+                        if (automaticOnlineSearchEnabled && !string.IsNullOrEmpty(currentArtist))
+                        {
+                            string searchArtist = currentArtist;
+                            Task.Run(async () =>
+                            {
+                                var ytTracks = await YouTubeEngine.SearchArtistAsync(searchArtist);
+                                if (ytTracks != null && ytTracks.Count > 0)
+                                {
+                                    if (this.IsHandleCreated && !this.IsDisposed)
+                                    {
+                                        this.Invoke(new Action(() => {
+                                            // Verificar que no haya cambiado la pista actual mientras buscábamos
+                                            if (lblNowPlaying.Text.Contains(searchArtist))
+                                            {
+                                                foreach (var yt in ytTracks)
+                                                {
+                                                    var item = new ListViewItem("🌐");
+                                                    item.SubItems.Add(yt.Title);
+                                                    item.SubItems.Add(searchArtist);
+                                                    item.SubItems.Add("YT"); // BPM placeholder
+                                                    item.SubItems.Add("-"); // Key placeholder
+                                                    item.SubItems.Add("YouTube: " + yt.Duration);
+                                                    item.SubItems.Add("yt");
+                                                    item.Tag = "YOUTUBE:" + yt.Url;
+                                                    item.ForeColor = Color.LightSkyBlue;
+                                                    trackList.Items.Add(item);
+                                                }
+                                                lblStatus.Text += string.Format(" (+{0} tracks en YouTube listos para descargar)", ytTracks.Count);
+                                            }
+                                        }));
+                                    }
+                                }
+                            });
+                        }
+                    }));
+                }
+            });
         }
 
         private static bool IsSameGenreFamily(string genre1, string genre2)
@@ -751,19 +823,320 @@ namespace ArkaiosDJAssistant
             return false;
         }
 
+        private void AddTrackToHub(string filePath)
+        {
+            AddTrackToHub(filePath, true);
+        }
+
+        private void AddTrackToHub(string filePath, bool focusAssistantTab)
+        {
+            if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return;
+            DownloadRegistry.Register(filePath, "", Path.GetFileNameWithoutExtension(filePath), "Descarga nueva", Path.GetExtension(filePath).ToLowerInvariant());
+            if (!downloadedHubTracks.Any(path => string.Equals(path, filePath, StringComparison.OrdinalIgnoreCase)))
+                downloadedHubTracks.Add(filePath);
+
+            if (isIdle)
+            {
+                isIdle = false;
+                idlePanel.Visible = false;
+                trackList.Visible = true;
+            }
+
+            ListViewItem item = AppendHubTrack(filePath);
+            if (focusAssistantTab && mainTabs != null && mainTabs.TabPages.Count > 0)
+                mainTabs.SelectedIndex = 0;
+            SelectHubTrack(item);
+            lblStatus.Text = "↓ Track descargado en descargas recientes. Arrástralo desde el final de la lista hacia el plato.";
+        }
+
+        private async Task DownloadMissingRecommendationAsync(ListViewItem item, string payload)
+        {
+            string preferredType = "music";
+            string query = payload ?? "";
+            int separator = query.IndexOf('|');
+            if (separator >= 0)
+            {
+                preferredType = query.Substring(0, separator);
+                query = query.Substring(separator + 1);
+            }
+            if (string.IsNullOrWhiteSpace(query)) return;
+
+            string mediaType = AskMissingDownloadType(query, preferredType);
+            if (string.IsNullOrWhiteSpace(mediaType)) return;
+
+            item.Text = "...";
+            item.ForeColor = Color.Orange;
+            lblStatus.Text = "Buscando pista faltante en internet: " + query;
+
+            OperationProgressDialog progress = new OperationProgressDialog("Descargando pista faltante de Auto Help + Camelot");
+            progress.Show(this);
+            try
+            {
+                progress.SetBatchStatus(1, 3, "Buscando en YouTube", query);
+                List<YouTubeTrack> ytTracks = await YouTubeEngine.SearchAsync(query, mediaType, 5);
+                if (ytTracks == null || ytTracks.Count == 0)
+                {
+                    string alternateType = mediaType == "video" ? "music" : "video";
+                    if (!AskTryAlternate(mediaType, alternateType))
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se encontro el formato solicitado. Sigue como FALTA.");
+                        lblStatus.Text = "No se encontro el formato solicitado.";
+                        return;
+                    }
+                    mediaType = alternateType;
+                    progress.SetBatchStatus(1, 3, "Buscando formato alterno en YouTube", query);
+                    ytTracks = await YouTubeEngine.SearchAsync(query, mediaType, 5);
+                    if (ytTracks == null || ytTracks.Count == 0)
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se encontro ni audio ni video.");
+                        lblStatus.Text = "No se encontro ni audio ni video.";
+                        return;
+                    }
+                }
+
+                YouTubeTrack best = ytTracks[0];
+                progress.SetBatchStatus(2, 3, "Descargando", best.Title);
+                string quality = mediaType == "video" ? "1080p estable" : "MP3 320 kbps";
+                string localPath = await YouTubeEngine.DownloadAsync(best.Url, mediaType, quality);
+                if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+                {
+                    string alternateType = mediaType == "video" ? "music" : "video";
+                    if (!AskTryAlternate(mediaType, alternateType))
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se pudo descargar el formato solicitado. Sigue como FALTA.");
+                        lblStatus.Text = "No se pudo descargar el formato solicitado.";
+                        return;
+                    }
+                    mediaType = alternateType;
+                    progress.SetBatchStatus(1, 3, "Buscando formato alterno en YouTube", query);
+                    ytTracks = await YouTubeEngine.SearchAsync(query, mediaType, 5);
+                    if (ytTracks == null || ytTracks.Count == 0)
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("No se encontro el formato alterno.");
+                        lblStatus.Text = "No se encontro el formato alterno.";
+                        return;
+                    }
+                    best = ytTracks[0];
+                    progress.SetBatchStatus(2, 3, "Descargando formato alterno", best.Title);
+                    quality = mediaType == "video" ? "1080p estable" : "MP3 320 kbps";
+                    localPath = await YouTubeEngine.DownloadAsync(best.Url, mediaType, quality);
+                    if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+                    {
+                        item.Text = "FALTA";
+                        item.ForeColor = Color.Gray;
+                        progress.SetResult("Tampoco se pudo descargar el formato alterno.");
+                        lblStatus.Text = "No se pudo descargar ni audio ni video.";
+                        return;
+                    }
+                }
+
+                progress.SetBatchStatus(3, 3, "Registrando en Hub", Path.GetFileName(localPath));
+                DownloadRegistry.Register(localPath, best.Url, best.Title, best.Uploader, mediaType);
+                item.Text = "↓";
+                item.ForeColor = Color.LightGreen;
+                item.SubItems[5].Text = Path.GetFileName(localPath);
+                item.SubItems[6].Text = Path.GetExtension(localPath).ToLowerInvariant();
+                item.Tag = localPath;
+                AddTrackToHub(localPath, true);
+                if (downloadHub != null) downloadHub.AddDownloadedFile(localPath);
+                progress.SetResult("Descargada y agregada como reciente: " + localPath);
+                lblStatus.Text = "Pista faltante descargada, registrada y agregada a descargas recientes.";
+            }
+            finally
+            {
+                System.Threading.Thread.Sleep(500);
+                progress.Close();
+                progress.Dispose();
+            }
+        }
+
+        private string AskMissingDownloadType(string query, string preferredType)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = "Descargar pista faltante";
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.MinimizeBox = false;
+                dialog.MaximizeBox = false;
+                dialog.ClientSize = new Size(480, 175);
+                dialog.BackColor = Color.FromArgb(25, 25, 25);
+                dialog.ForeColor = Color.White;
+
+                var label = new Label
+                {
+                    Text = "VirtualDJ tiene esta metadata, pero falta el archivo fisico:\n\n" + query + "\n\nElige que deseas buscar y descargar:",
+                    Dock = DockStyle.Top,
+                    Height = 100,
+                    Padding = new Padding(12),
+                    ForeColor = Color.White
+                };
+                dialog.Controls.Add(label);
+
+                string selected = null;
+                var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 55, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8) };
+                var cancel = new Button { Text = "Cancelar", Width = 100, Height = 32 };
+                var video = new Button { Text = "Video MP4", Width = 115, Height = 32 };
+                var audio = new Button { Text = "Audio MP3", Width = 115, Height = 32 };
+                cancel.Click += (s, e) => { selected = null; dialog.DialogResult = DialogResult.Cancel; dialog.Close(); };
+                video.Click += (s, e) => { selected = "video"; dialog.DialogResult = DialogResult.OK; dialog.Close(); };
+                audio.Click += (s, e) => { selected = "music"; dialog.DialogResult = DialogResult.OK; dialog.Close(); };
+                buttons.Controls.Add(cancel);
+                buttons.Controls.Add(video);
+                buttons.Controls.Add(audio);
+                dialog.Controls.Add(buttons);
+
+                dialog.Shown += (s, e) => { if (preferredType == "video") video.Focus(); else audio.Focus(); };
+                return dialog.ShowDialog(this) == DialogResult.OK ? selected : null;
+            }
+        }
+
+        private bool AskTryAlternate(string failedType, string alternateType)
+        {
+            string failedLabel = failedType == "video" ? "video MP4" : "audio MP3";
+            string alternateLabel = alternateType == "video" ? "video MP4" : "audio MP3";
+            DialogResult answer = MessageBox.Show(
+                "No se pudo obtener como " + failedLabel + ".\n\nDeseas intentar descargarlo como " + alternateLabel + "?",
+                "Intentar formato alterno",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            return answer == DialogResult.Yes;
+        }
+
+        private static bool IsVideoExtension(string extension)
+        {
+            string ext = (extension ?? "").ToLowerInvariant();
+            return ext == ".mp4" || ext == ".mkv" || ext == ".webm" || ext == ".avi" || ext == ".mov";
+        }
+
+        private void RefreshVirtualDjLibrary()
+        {
+            lblStatus.Text = "Actualizando database.xml y motor Camelot...";
+            downloadHub.SetLibraryRefreshBusy(true, "Actualizando database.xml y motor Camelot...");
+            Task.Run(() =>
+            {
+                LoadDatabase(AppSettings.VdjDatabaseFile);
+                if (IsHandleCreated && !IsDisposed) Invoke(new Action(() =>
+                {
+                    lblStatus.Text = string.Format("Biblioteca actualizada: {0} tracks con metadatos de VirtualDJ.", allTracks.Count);
+                    downloadHub.SetLibraryRefreshBusy(false, lblStatus.Text);
+                }));
+            });
+        }
+
+        private void AppendHubTracks()
+        {
+            foreach (string path in downloadedHubTracks.Where(File.Exists)) AppendHubTrack(path);
+        }
+
+        private ListViewItem AppendHubTrack(string filePath)
+        {
+            foreach (ListViewItem existing in trackList.Items)
+                if (existing.Tag is string && string.Equals((string)existing.Tag, filePath, StringComparison.OrdinalIgnoreCase)) return existing;
+
+            EnsureHubSeparator();
+            var item = new ListViewItem("↓");
+            item.SubItems.Add(Path.GetFileNameWithoutExtension(filePath));
+            item.SubItems.Add("Descarga reciente");
+            item.SubItems.Add("-");
+            item.SubItems.Add("-");
+            item.SubItems.Add(Path.GetFileName(filePath));
+            item.SubItems.Add(Path.GetExtension(filePath).ToLowerInvariant());
+            item.Tag = filePath;
+            item.BackColor = Color.FromArgb(24, 65, 36);
+            item.ForeColor = Color.LightGreen;
+            trackList.Items.Add(item);
+            return item;
+        }
+
+        private void EnsureHubSeparator()
+        {
+            foreach (ListViewItem existing in trackList.Items)
+                if (existing.Tag is string && string.Equals((string)existing.Tag, "ARKAIOS_DOWNLOAD_SEPARATOR", StringComparison.OrdinalIgnoreCase)) return;
+
+            var separator = new ListViewItem("↓");
+            separator.SubItems.Add("DESCARGAS RECIENTES / HUB LOCAL");
+            separator.SubItems.Add("Separador");
+            separator.SubItems.Add("");
+            separator.SubItems.Add("");
+            separator.SubItems.Add("Arrastra las pistas de abajo al plato");
+            separator.SubItems.Add("");
+            separator.Tag = "ARKAIOS_DOWNLOAD_SEPARATOR";
+            separator.BackColor = Color.FromArgb(12, 90, 42);
+            separator.ForeColor = Color.White;
+            trackList.Items.Add(separator);
+        }
+
+        private void SelectHubTrack(ListViewItem item)
+        {
+            if (item == null) return;
+            trackList.SelectedItems.Clear();
+            item.Selected = true;
+            item.Focused = true;
+            item.EnsureVisible();
+            trackList.Focus();
+        }
+
+        private void SortTrackListByColumn(int column)
+        {
+            if (trackSortColumn == column) trackSortAscending = !trackSortAscending;
+            else
+            {
+                trackSortColumn = column;
+                trackSortAscending = true;
+            }
+
+            var items = trackList.Items.Cast<ListViewItem>().ToList();
+            items.Sort((a, b) =>
+            {
+                int value;
+                if (column == 3) value = ParseListDouble(a, column).CompareTo(ParseListDouble(b, column));
+                else value = string.Compare(GetListText(a, column), GetListText(b, column), StringComparison.OrdinalIgnoreCase);
+                return trackSortAscending ? value : -value;
+            });
+
+            trackList.BeginUpdate();
+            trackList.Items.Clear();
+            trackList.Items.AddRange(items.ToArray());
+            trackList.EndUpdate();
+            lblStatus.Text = "Lista ordenada por " + trackList.Columns[column].Text + ".";
+        }
+
+        private static string GetListText(ListViewItem item, int column)
+        {
+            if (column < item.SubItems.Count) return item.SubItems[column].Text ?? "";
+            return "";
+        }
+
+        private static double ParseListDouble(ListViewItem item, int column)
+        {
+            double parsed;
+            return double.TryParse(GetListText(item, column), NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) ? parsed : 0;
+        }
+
         private void TrackList_ItemDrag(object sender, ItemDragEventArgs e)
         {
             var selectedItems = trackList.SelectedItems;
             if (selectedItems.Count > 0)
             {
-                string[] files = new string[selectedItems.Count];
+                var fileList = new List<string>();
                 for (int i = 0; i < selectedItems.Count; i++)
                 {
-                    files[i] = selectedItems[i].Tag.ToString();
+                    string path = selectedItems[i].Tag == null ? "" : selectedItems[i].Tag.ToString();
+                    if (File.Exists(path)) fileList.Add(path);
                 }
+                if (fileList.Count == 0) return;
 
                 // Generar un DataObject con el arreglo de archivos (CF_HDROP = FileDrop)
-                DataObject data = new DataObject(DataFormats.FileDrop, files);
+                DataObject data = new DataObject(DataFormats.FileDrop, fileList.ToArray());
                 
                 // Iniciar la operación de arrastrar y soltar de forma nativa (Win32 compatible)
                 trackList.DoDragDrop(data, DragDropEffects.Copy);

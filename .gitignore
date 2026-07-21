@@ -6,7 +6,19 @@ task.md
 # Archivos de licencias
 *.key
 ventas_licencias.log
+youtube-cookies.txt
+cookies.txt
+*.cookies.txt
+downloaded-hub-tracks.log
+yt-dlp-errors.log
+exports/
 
 # Archivos binarios locales
 ArkaiosDJ.exe
 ArkaiosDJ.zip
+ArkaiosDJ.rar
+ArkaiosDJ_Protected.zip
+yt-dlp.exe
+dist/
+rename-history/
+installer/payload/*.exe
