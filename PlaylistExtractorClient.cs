@@ -34,7 +34,8 @@ namespace ArkaiosDJAssistant
 
     public static class PlaylistExtractorClient
     {
-        private const string Endpoint = "https://youtube-playlist-extractor.onrender.com/extract";
+        private const string DefaultEndpoint = "https://youtube-playlist-extractor.onrender.com/extract";
+        private const string ServicesEndpoint = "https://servidor-arkaios-api.vercel.app/api/ecosystem/services";
 
         public static async Task<PlaylistExtractResult> ExtractAsync(string playlistUrl)
         {
@@ -73,7 +74,8 @@ namespace ArkaiosDJAssistant
                     {
                         client.Encoding = Encoding.UTF8;
                         client.Headers[HttpRequestHeader.ContentType] = "application/json";
-                        string json = client.UploadString(Endpoint, "POST", body);
+                        string endpoint = ResolvePlaylistEndpoint();
+                        string json = client.UploadString(endpoint, "POST", body);
                         return ParseRemoteJson(json, "Render API");
                     }
                 }
@@ -100,6 +102,33 @@ namespace ArkaiosDJAssistant
                     return new PlaylistExtractResult { Success = false, Source = "Render API", Error = ex.Message };
                 }
             });
+        }
+
+        private static string ResolvePlaylistEndpoint()
+        {
+            try
+            {
+                ForceModernTls();
+                using (var client = new WebClient())
+                {
+                    client.Encoding = Encoding.UTF8;
+                    string json = client.DownloadString(ServicesEndpoint);
+                    var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                    var root = serializer.Deserialize<Dictionary<string, object>>(json);
+                    var services = GetDictionary(root, "services");
+                    var playlist = GetDictionary(services, "playlistExtractor");
+                    string baseUrl = ToString(playlist, "url").TrimEnd('/');
+                    string extractPath = ToString(playlist, "extractPath");
+                    if (string.IsNullOrWhiteSpace(extractPath)) extractPath = "/extract";
+                    if (!string.IsNullOrWhiteSpace(baseUrl)) return baseUrl + extractPath;
+                }
+            }
+            catch
+            {
+                // Fallback intencional: mantiene compatibilidad si el manifiesto no responde.
+            }
+
+            return DefaultEndpoint;
         }
 
         private static void ForceModernTls()
@@ -233,8 +262,16 @@ namespace ArkaiosDJAssistant
 
         private static string ToString(Dictionary<string, object> value, string key)
         {
+            if (value == null) return "";
             object raw;
             return value.TryGetValue(key, out raw) && raw != null ? raw.ToString() : "";
+        }
+
+        private static Dictionary<string, object> GetDictionary(Dictionary<string, object> value, string key)
+        {
+            if (value == null) return null;
+            object raw;
+            return value.TryGetValue(key, out raw) ? raw as Dictionary<string, object> : null;
         }
 
         private static int ToInt(Dictionary<string, object> value, string key)
