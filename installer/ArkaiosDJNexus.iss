@@ -63,7 +63,8 @@ begin
 
   Args := '-NoProfile -ExecutionPolicy Bypass -Command "' +
     '$n=[System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object { $_.OperationalStatus -eq ''Up'' -and $_.NetworkInterfaceType -ne ''Loopback'' } | Select-Object -First 1; ' +
-    'if ($n) { $n.GetPhysicalAddress().ToString() } else { ''HWID_NOT_FOUND_'' + $env:COMPUTERNAME } | Out-File -LiteralPath ''' + OutputFile + ''' -Encoding ascii"';
+    'if ($n) { $hwid=$n.GetPhysicalAddress().ToString() } else { $hwid=''HWID_NOT_FOUND_'' + $env:COMPUTERNAME }; ' +
+    'Set-Content -LiteralPath ''' + OutputFile + ''' -Value $hwid -Encoding ascii"';
 
   if Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
   begin
