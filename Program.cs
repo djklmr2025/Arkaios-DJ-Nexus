@@ -124,6 +124,7 @@ namespace ArkaiosDJAssistant
         private TabControl mainTabs;
         private TabPage assistantTab;
         private TabPage allTracksTab;
+        private TabPage hot100Tab;
         private TabPage mediaTab;
         private TabPage hitsTab;
         private TabPage hubTab;
@@ -151,11 +152,13 @@ namespace ArkaiosDJAssistant
             mainTabs = new TabControl { Dock = DockStyle.Fill };
             assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
             allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
+            hot100Tab = new TabPage("Hot 100") { BackColor = Color.FromArgb(20, 20, 20) };
             mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
             hitsTab = new TabPage("Hits / Plataformas") { BackColor = Color.FromArgb(20, 20, 20) };
             hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
             organizerTab = new TabPage("Organizador IA / Renombrador") { BackColor = Color.FromArgb(20, 20, 20) };
             assistantTab.Controls.Add(mainPanel);
+            hot100Tab.Controls.Add(new Hot100Control());
             var allTracksControl = new AllTracksSearchControl();
             allTracksControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
             allTracksTab.Controls.Add(allTracksControl);
@@ -473,6 +476,7 @@ namespace ArkaiosDJAssistant
             mainTabs.TabPages.Clear();
             mainTabs.TabPages.Add(assistantTab);
             mainTabs.TabPages.Add(allTracksTab);
+            mainTabs.TabPages.Add(hot100Tab);
             if (AppSettings.ShowAdvancedTabs)
             {
                 mainTabs.TabPages.Add(mediaTab);
