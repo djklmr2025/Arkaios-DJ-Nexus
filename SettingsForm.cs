@@ -2,6 +2,7 @@ using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace ArkaiosDJAssistant
 {
@@ -147,6 +148,84 @@ namespace ArkaiosDJAssistant
             Button btnRemoveFolder = new Button { Text = "Remove Selected", Location = new Point(420, 320), Width = 130, Height = 30, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 50, 50) };
             btnRemoveFolder.Click += BtnRemoveFolder_Click;
             tabLibrary.Controls.Add(btnRemoveFolder);
+
+            // License Tab
+            TabPage tabLicense = new TabPage("Licencia") { BackColor = Color.FromArgb(30, 30, 30) };
+            tabControl.TabPages.Add(tabLicense);
+
+            Label lblLicTitle = new Label { Text = "Cómo obtener tu licencia", Font = new Font("Segoe UI", 12, FontStyle.Bold), Location = new Point(20, 20), AutoSize = true };
+            tabLicense.Controls.Add(lblLicTitle);
+
+            Label lblLicDesc = new Label
+            {
+                Text = "Arkaios DJ Nexus requiere una licencia activa por dispositivo (HWID) o una\n" +
+                       "licencia Vitalicia Universal. Para obtener tu serial debes registrarte en el\n" +
+                       "portal oficial de Arkaios World y luego pegar la clave recibida en la\n" +
+                       "ventana de activación.",
+                Location = new Point(20, 55),
+                Width = 520,
+                Height = 70,
+                ForeColor = Color.LightGray,
+                Font = new Font("Segoe UI", 9)
+            };
+            tabLicense.Controls.Add(lblLicDesc);
+
+            Label lblStep1 = new Label { Text = "1. Regístrate para obtener tu serial:", Font = new Font("Segoe UI", 9, FontStyle.Bold), Location = new Point(20, 135), AutoSize = true };
+            tabLicense.Controls.Add(lblStep1);
+
+            LinkLabel lnkArkaiosWorld = new LinkLabel
+            {
+                Text = "Arkaios-Expo (arkaios-world.web.app)",
+                Location = new Point(20, 158),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9, FontStyle.Underline),
+                LinkColor = Color.DeepSkyBlue,
+                VisitedLinkColor = Color.DeepSkyBlue
+            };
+            lnkArkaiosWorld.Links.Add(0, lnkArkaiosWorld.Text.Length, "https://arkaios-world.web.app/");
+            lnkArkaiosWorld.LinkClicked += (s, ev) => Process.Start(ev.Link.LinkData.ToString());
+            tabLicense.Controls.Add(lnkArkaiosWorld);
+
+            Label lblStep2 = new Label { Text = "2. Portal / estado del servicio de licencias:", Font = new Font("Segoe UI", 9, FontStyle.Bold), Location = new Point(20, 190), AutoSize = true };
+            tabLicense.Controls.Add(lblStep2);
+
+            LinkLabel lnkPortal = new LinkLabel
+            {
+                Text = "servidor-arkaios-api.vercel.app",
+                Location = new Point(20, 213),
+                AutoSize = true,
+                Font = new Font("Segoe UI", 9, FontStyle.Underline),
+                LinkColor = Color.DeepSkyBlue,
+                VisitedLinkColor = Color.DeepSkyBlue
+            };
+            lnkPortal.Links.Add(0, lnkPortal.Text.Length, "https://servidor-arkaios-api.vercel.app/");
+            lnkPortal.LinkClicked += (s, ev) => Process.Start(ev.Link.LinkData.ToString());
+            tabLicense.Controls.Add(lnkPortal);
+
+            Label lblHwidTitle = new Label { Text = "Tu Hardware ID (lo necesitas para el registro):", Font = new Font("Segoe UI", 9, FontStyle.Bold), Location = new Point(20, 250), AutoSize = true };
+            tabLicense.Controls.Add(lblHwidTitle);
+
+            TextBox txtHwid = new TextBox
+            {
+                Text = LicenseManager.GetHardwareId(),
+                Location = new Point(20, 273),
+                Width = 400,
+                ReadOnly = true,
+                Font = new Font("Consolas", 9),
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.Cyan
+            };
+            tabLicense.Controls.Add(txtHwid);
+
+            Button btnActivateNow = new Button { Text = "Ingresar clave de licencia", Location = new Point(20, 310), Width = 200, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 120, 215) };
+            btnActivateNow.Click += (s, ev) =>
+            {
+                using (var activation = new ActivationForm())
+                {
+                    activation.ShowDialog(this);
+                }
+            };
+            tabLicense.Controls.Add(btnActivateNow);
 
             // Bottom Panel
             Panel pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.FromArgb(25, 25, 25) };

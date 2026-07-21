@@ -14,7 +14,7 @@ namespace ArkaiosDJAssistant
         public ActivationForm()
         {
             this.Text = "Arkaios DJ Nexus - Activación de Producto";
-            this.Size = new Size(500, 320);
+            this.Size = new Size(500, 360);
             this.BackColor = Color.FromArgb(20, 20, 20);
             this.ForeColor = Color.White;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -38,15 +38,37 @@ namespace ArkaiosDJAssistant
             lblHwid.ForeColor = Color.Cyan;
             this.Controls.Add(lblHwid);
 
+            LinkLabel lnkRegister = new LinkLabel();
+            lnkRegister.Text = "¿No tienes clave? Regístrate en Arkaios-Expo para obtener tu serial";
+            lnkRegister.Location = new Point(30, 90);
+            lnkRegister.AutoSize = true;
+            lnkRegister.Font = new Font("Segoe UI", 9);
+            lnkRegister.LinkColor = Color.DeepSkyBlue;
+            lnkRegister.VisitedLinkColor = Color.DeepSkyBlue;
+            lnkRegister.Links.Add(lnkRegister.Text.IndexOf("Arkaios-Expo"), "Arkaios-Expo".Length, "https://arkaios-world.web.app/");
+            lnkRegister.LinkClicked += (s, ev) => System.Diagnostics.Process.Start(ev.Link.LinkData.ToString());
+            this.Controls.Add(lnkRegister);
+
+            LinkLabel lnkPortal = new LinkLabel();
+            lnkPortal.Text = "Estado del servicio: servidor-arkaios-api.vercel.app";
+            lnkPortal.Location = new Point(30, 112);
+            lnkPortal.AutoSize = true;
+            lnkPortal.Font = new Font("Segoe UI", 8);
+            lnkPortal.LinkColor = Color.DeepSkyBlue;
+            lnkPortal.VisitedLinkColor = Color.DeepSkyBlue;
+            lnkPortal.Links.Add(lnkPortal.Text.IndexOf("servidor-arkaios-api.vercel.app"), "servidor-arkaios-api.vercel.app".Length, "https://servidor-arkaios-api.vercel.app/");
+            lnkPortal.LinkClicked += (s, ev) => System.Diagnostics.Process.Start(ev.Link.LinkData.ToString());
+            this.Controls.Add(lnkPortal);
+
             Label lblInst = new Label();
-            lblInst.Text = "Envía tu Hardware ID al distribuidor y pega aquí tu clave:";
-            lblInst.Location = new Point(30, 90);
+            lblInst.Text = "Ya con tu clave en mano, pégala aquí:";
+            lblInst.Location = new Point(30, 138);
             lblInst.AutoSize = true;
             lblInst.Font = new Font("Segoe UI", 10);
             this.Controls.Add(lblInst);
 
             txtKey = new TextBox();
-            txtKey.Location = new Point(30, 120);
+            txtKey.Location = new Point(30, 165);
             txtKey.Width = 420;
             txtKey.Height = 80;
             txtKey.Multiline = true;
@@ -57,7 +79,7 @@ namespace ArkaiosDJAssistant
 
             Button btnActivate = new Button();
             btnActivate.Text = "Activar Software";
-            btnActivate.Location = new Point(175, 220);
+            btnActivate.Location = new Point(175, 255);
             btnActivate.Width = 150;
             btnActivate.Height = 35;
             btnActivate.FlatStyle = FlatStyle.Flat;
