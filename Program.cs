@@ -644,8 +644,11 @@ namespace ArkaiosDJAssistant
                             lblNowPlaying.Text = "No se encontró metadata en DB para:\n" + Path.GetFileName(filePath);
                         }));
                     }
+                    PlateLoadReporter.ReportAsync(null, filePath);
                     return;
                 }
+
+                PlateLoadReporter.ReportAsync(playingTrack, filePath);
 
                 var distinctTracks = allTracks
                     .Where(t => t.FilePath != playingTrack.FilePath)
