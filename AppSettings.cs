@@ -17,6 +17,7 @@ namespace ArkaiosDJAssistant
         public static string YouTubeCookiesBrowser { get; set; }
         public static string YouTubeCookiesFile { get; set; }
         public static List<string> AllowedFolders { get; set; }
+        public static string AgentReportKey { get; set; }
 
         public static string MediaLibraryRoot
         {
@@ -72,6 +73,7 @@ namespace ArkaiosDJAssistant
             YouTubeCookiesBrowser = "chrome";
             YouTubeCookiesFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "youtube-cookies.txt");
             AllowedFolders = new List<string>();
+            AgentReportKey = "";
         }
 
         public static void Load()
@@ -113,6 +115,10 @@ namespace ArkaiosDJAssistant
                         {
                             PreviewAudioDevice = line.Substring("preview_audio_device=".Length).Trim();
                         }
+                        else if (line.StartsWith("agent_report_key=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            AgentReportKey = line.Substring("agent_report_key=".Length).Trim();
+                        }
                         else if (!string.IsNullOrWhiteSpace(line))
                             AllowedFolders.Add(line);
                     }
@@ -132,6 +138,7 @@ namespace ArkaiosDJAssistant
             lines.Add("youtube_cookies_file=" + (YouTubeCookiesFile ?? ""));
             lines.Add("show_advanced_tabs=" + (ShowAdvancedTabs ? "1" : "0"));
             lines.Add("preview_audio_device=" + (PreviewAudioDevice ?? ""));
+            lines.Add("agent_report_key=" + (AgentReportKey ?? ""));
             File.WriteAllLines(settingsFile, lines.ToArray());
         }
         

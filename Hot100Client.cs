@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -48,8 +49,8 @@ namespace ArkaiosDJAssistant
         {
             return await Task.Run(() =>
             {
-                string endpoint = ResolveHot100Endpoint(countryCode);
-                if (string.IsNullOrWhiteSpace(endpoint))
+                Hot100Service service = ResolveHot100Service();
+                if (service == null || string.IsNullOrWhiteSpace(service.ReadUrl))
                 {
                     return new Hot100Result
                     {
@@ -58,13 +59,16 @@ namespace ArkaiosDJAssistant
                     };
                 }
 
+                string countryParam = string.IsNullOrWhiteSpace(countryCode) ? "MX" : countryCode;
+                string url = service.ReadUrl + (service.ReadUrl.Contains("?") ? "&" : "?") + "countryCode=" + Uri.EscapeDataString(countryParam);
+
                 try
                 {
                     ForceModernTls();
                     using (var client = new WebClient())
                     {
                         client.Encoding = Encoding.UTF8;
-                        string json = client.DownloadString(endpoint);
+                        string json = client.DownloadString(url);
                         return ParseJson(json);
                     }
                 }
@@ -75,7 +79,72 @@ namespace ArkaiosDJAssistant
             });
         }
 
-        private static string ResolveHot100Endpoint(string countryCode)
+        /// <summary>
+        /// Reporta de forma silenciosa que un track fue cargado al plato, para que el
+        /// backend actualice el conteo del Hot 100. Nunca lanza excepciones hacia el
+        /// llamador ni bloquea la UI: si el manifiesto no expone el endpoint de
+        /// ingest, o el POST falla, simplemente no hace nada.
+        /// </summary>
+        public static void ReportTrackLoadedFireAndForget(Track track)
+        {
+            if (track == null) return;
+            Task.Run(() =>
+            {
+                try
+                {
+                    Hot100Service service = ResolveHot100Service();
+                    if (service == null || string.IsNullOrWhiteSpace(service.IngestUrl)) return;
+
+                    string title = track.Title ?? "";
+                    string artist = track.Artist ?? "";
+                    if (!IsRealTrackName(title) || !IsRealTrackName(artist)) return;
+
+                    var payload = new Dictionary<string, object>
+                    {
+                        { "source", "arkaios-dj-assistant" },
+                        { "loadedAt", DateTime.UtcNow.ToString("o") },
+                        { "track", new Dictionary<string, object>
+                            {
+                                { "title", title },
+                                { "artist", artist },
+                                { "displayName", artist + " - " + title },
+                                { "fileName", Path.GetFileName(track.FilePath ?? "") },
+                                { "bpm", track.Bpm },
+                                { "camelotKey", track.CamelotKey ?? "" }
+                            }
+                        }
+                    };
+
+                    var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                    string json = serializer.Serialize(payload);
+
+                    ForceModernTls();
+                    using (var client = new WebClient())
+                    {
+                        client.Encoding = Encoding.UTF8;
+                        client.Headers[HttpRequestHeader.ContentType] = "application/json";
+                        string agentKey = AppSettings.AgentReportKey;
+                        if (!string.IsNullOrWhiteSpace(agentKey))
+                        {
+                            client.Headers["X-Arkaios-Agent-Key"] = agentKey;
+                        }
+                        client.UploadString(service.IngestUrl, "POST", json);
+                    }
+                }
+                catch
+                {
+                    // Silencioso a propósito: nunca debe afectar la UI ni el flujo principal.
+                }
+            });
+        }
+
+        private class Hot100Service
+        {
+            public string ReadUrl;
+            public string IngestUrl;
+        }
+
+        private static Hot100Service ResolveHot100Service()
         {
             try
             {
@@ -91,13 +160,17 @@ namespace ArkaiosDJAssistant
                     string baseUrl = ToString(hot100, "url").TrimEnd('/');
                     if (string.IsNullOrWhiteSpace(baseUrl)) return null;
 
-                    string path = ToString(hot100, "path");
-                    if (string.IsNullOrWhiteSpace(path)) path = "/api/hot100";
+                    string readPath = ToString(hot100, "path");
+                    if (string.IsNullOrWhiteSpace(readPath)) readPath = "/api/hot100";
 
-                    string url = baseUrl + path;
-                    string countryParam = string.IsNullOrWhiteSpace(countryCode) ? "MX" : countryCode;
-                    url += (url.Contains("?") ? "&" : "?") + "countryCode=" + Uri.EscapeDataString(countryParam);
-                    return url;
+                    string ingestPath = ToString(hot100, "ingestPath");
+                    if (string.IsNullOrWhiteSpace(ingestPath)) ingestPath = "/api/hot100/ingest";
+
+                    return new Hot100Service
+                    {
+                        ReadUrl = baseUrl + readPath,
+                        IngestUrl = baseUrl + ingestPath
+                    };
                 }
             }
             catch

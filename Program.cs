@@ -651,6 +651,10 @@ namespace ArkaiosDJAssistant
                     return;
                 }
 
+                // Reporta al ecosistema ARKAIOS que este track se cargó al plato, para
+                // alimentar el Hot 100 propio. No bloquea ni afecta si falla.
+                Hot100Client.ReportTrackLoadedFireAndForget(playingTrack);
+
                 var distinctTracks = allTracks
                     .Where(t => t.FilePath != playingTrack.FilePath)
                     .GroupBy(t => (t.Artist ?? "") + "|" + (t.Title ?? ""))

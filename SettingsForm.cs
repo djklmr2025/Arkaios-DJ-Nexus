@@ -13,6 +13,7 @@ namespace ArkaiosDJAssistant
         private CheckBox chkAdvancedTabs;
         private ComboBox cboAudioDevice;
         private TextBox txtVdjExe;
+        private TextBox txtAgentReportKey;
         private ListBox lstFolders;
 
         public SettingsForm()
@@ -227,6 +228,32 @@ namespace ArkaiosDJAssistant
             };
             tabLicense.Controls.Add(btnActivateNow);
 
+            Label lblAgentKeyTitle = new Label { Text = "Clave de reporte al ecosistema (Hot 100, opcional):", Font = new Font("Segoe UI", 9, FontStyle.Bold), Location = new Point(260, 250), AutoSize = true };
+            tabLicense.Controls.Add(lblAgentKeyTitle);
+
+            txtAgentReportKey = new TextBox
+            {
+                Text = AppSettings.AgentReportKey,
+                Location = new Point(260, 273),
+                Width = 280,
+                UseSystemPasswordChar = true,
+                Font = new Font("Consolas", 9),
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White
+            };
+            tabLicense.Controls.Add(txtAgentReportKey);
+
+            Label lblAgentKeyNote = new Label
+            {
+                Text = "La entrega tu administrador de backend. Sin ella, la app solo lee\nel Hot 100 pero no reporta cargas al plato.",
+                Location = new Point(260, 297),
+                Width = 280,
+                Height = 40,
+                ForeColor = Color.LightGray,
+                Font = new Font("Segoe UI", 7)
+            };
+            tabLicense.Controls.Add(lblAgentKeyNote);
+
             // Bottom Panel
             Panel pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.FromArgb(25, 25, 25) };
             this.Controls.Add(pnlBottom);
@@ -264,6 +291,7 @@ namespace ArkaiosDJAssistant
             AppSettings.ShowAdvancedTabs = chkAdvancedTabs.Checked;
             AppSettings.PreviewAudioDevice = cboAudioDevice.SelectedItem == null ? AudioDeviceCatalog.DefaultDevice : cboAudioDevice.SelectedItem.ToString();
             AppSettings.VdjExecutableFile = txtVdjExe.Text;
+            AppSettings.AgentReportKey = txtAgentReportKey.Text.Trim();
             AppSettings.AllowedFolders.Clear();
             foreach (var item in lstFolders.Items)
             {
