@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ArkaiosDJAssistant
 {
@@ -17,6 +18,47 @@ namespace ArkaiosDJAssistant
         public static string YouTubeCookiesBrowser { get; set; }
         public static string YouTubeCookiesFile { get; set; }
         public static List<string> AllowedFolders { get; set; }
+
+        public static void AutoDetectVirtualDjPaths()
+        {
+            if (!string.IsNullOrWhiteSpace(VdjDatabaseFile) && File.Exists(VdjDatabaseFile))
+                return;
+
+            foreach (string baseFolder in GetVirtualDjBaseCandidates())
+            {
+                string database = Path.Combine(baseFolder, "database.xml");
+                string history = Path.Combine(baseFolder, "History");
+                if (File.Exists(database))
+                {
+                    VdjDatabaseFile = database;
+                    VdjHistoryFolder = Directory.Exists(history) ? history : baseFolder;
+                    return;
+                }
+            }
+        }
+
+        private static IEnumerable<string> GetVirtualDjBaseCandidates()
+        {
+            var candidates = new List<string>();
+            string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+            if (!string.IsNullOrWhiteSpace(documents))
+            {
+                candidates.Add(Path.Combine(documents, "VirtualDJ"));
+                candidates.Add(Path.Combine(documents, "VirtualDJ", "Database"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(profile))
+            {
+                candidates.Add(Path.Combine(profile, "Documents", "VirtualDJ"));
+                candidates.Add(Path.Combine(profile, "Documentos", "VirtualDJ"));
+                candidates.Add(Path.Combine(profile, "OneDrive", "Documents", "VirtualDJ"));
+                candidates.Add(Path.Combine(profile, "OneDrive", "Documentos", "VirtualDJ"));
+            }
+
+            return candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase);
+        }
 
         public static string MediaLibraryRoot
         {
@@ -118,6 +160,8 @@ namespace ArkaiosDJAssistant
                     }
                 }
             }
+
+            AutoDetectVirtualDjPaths();
         }
 
         public static void Save()

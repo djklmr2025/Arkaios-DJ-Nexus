@@ -11,7 +11,6 @@ namespace ArkaiosDJAssistant
         private CheckBox chkTransparency;
         private CheckBox chkAdvancedTabs;
         private ComboBox cboAudioDevice;
-        private TextBox txtVdjExe;
         private ListBox lstFolders;
 
         public SettingsForm()
@@ -44,24 +43,16 @@ namespace ArkaiosDJAssistant
             };
             tabGeneral.Controls.Add(chkTransparency);
 
-            Label lblVdjExe = new Label { Text = "VirtualDJ Executable Path:", Font = new Font("Segoe UI", 10, FontStyle.Bold), Location = new Point(20, 110), AutoSize = true };
-            tabGeneral.Controls.Add(lblVdjExe);
-
-            txtVdjExe = new TextBox { Text = AppSettings.VdjExecutableFile, Location = new Point(20, 135), Width = 400, Font = new Font("Segoe UI", 10), BackColor = Color.FromArgb(40, 40, 40), ForeColor = Color.White };
-            tabGeneral.Controls.Add(txtVdjExe);
-
-            Button btnBrowseExe = new Button { Text = "Browse", Location = new Point(430, 134), Width = 80, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 50, 50) };
-            btnBrowseExe.Click += (s, ev) => 
+            Label lblVdjNote = new Label
             {
-                using (OpenFileDialog ofd = new OpenFileDialog { Filter = "Executables (*.exe)|*.exe|All files (*.*)|*.*", Title = "Select VirtualDJ Executable" })
-                {
-                    if (ofd.ShowDialog() == DialogResult.OK)
-                    {
-                        txtVdjExe.Text = ofd.FileName;
-                    }
-                }
+                Text = "VirtualDJ se detecta por su base de datos e historial abiertos. Este sistema ya no necesita la ruta del .exe para vincularse.",
+                Font = new Font("Segoe UI", 9),
+                Location = new Point(20, 110),
+                Width = 520,
+                Height = 42,
+                ForeColor = Color.LightGray
             };
-            tabGeneral.Controls.Add(btnBrowseExe);
+            tabGeneral.Controls.Add(lblVdjNote);
 
             // Options Tab
             TabPage tabOptions = new TabPage("Opciones") { BackColor = Color.FromArgb(30, 30, 30) };
@@ -184,7 +175,6 @@ namespace ArkaiosDJAssistant
             AppSettings.EnableTransparency = chkTransparency.Checked;
             AppSettings.ShowAdvancedTabs = chkAdvancedTabs.Checked;
             AppSettings.PreviewAudioDevice = cboAudioDevice.SelectedItem == null ? AudioDeviceCatalog.DefaultDevice : cboAudioDevice.SelectedItem.ToString();
-            AppSettings.VdjExecutableFile = txtVdjExe.Text;
             AppSettings.AllowedFolders.Clear();
             foreach (var item in lstFolders.Items)
             {

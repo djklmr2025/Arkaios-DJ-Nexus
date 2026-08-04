@@ -109,6 +109,7 @@ namespace ArkaiosDJAssistant
         private Label lblStatus;
         private List<Track> allTracks = new List<Track>();
         private Timer historyTimer;
+        private Timer attachTimer;
         private string vdjHistoryFolder;
         private string currentPlayingFile = "";
 
@@ -398,7 +399,7 @@ namespace ArkaiosDJAssistant
 
             Button btnLaunchVdj = new Button
             {
-                Text = "Abrir VirtualDJ",
+                Text = "Adjuntar a VirtualDJ",
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 BackColor = Color.FromArgb(0, 120, 215),
                 ForeColor = Color.White,
@@ -407,18 +408,7 @@ namespace ArkaiosDJAssistant
                 Anchor = AnchorStyles.Top,
                 Margin = new Padding(0, 20, 0, 0)
             };
-            btnLaunchVdj.Click += (s, ev) =>
-            {
-                if (!string.IsNullOrEmpty(AppSettings.VdjExecutableFile) && File.Exists(AppSettings.VdjExecutableFile))
-                {
-                    try { System.Diagnostics.Process.Start(AppSettings.VdjExecutableFile); }
-                    catch { MessageBox.Show("Error al intentar abrir VirtualDJ.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error); }
-                }
-                else
-                {
-                    MessageBox.Show("Por favor, configura la ruta del ejecutable de VirtualDJ en Settings primero.", "Falta configuración", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            };
+            btnLaunchVdj.Click += (s, ev) => LaunchOrAttachVirtualDj();
             idleLayout.Controls.Add(btnLaunchVdj, 0, 1);
             
             Panel container = new Panel { Dock = DockStyle.Fill };
@@ -466,6 +456,105 @@ namespace ArkaiosDJAssistant
             Task.Run(() => LoadDatabase(AppSettings.VdjDatabaseFile));
         }
 
+        private void LaunchOrAttachVirtualDj()
+        {
+            bool wasAlreadyRunning = IsVirtualDjRunning();
+            if (!wasAlreadyRunning)
+            {
+                lblStatus.Text = "VirtualDJ no esta abierto. Quedo en espera para adjuntarse cuando lo abras.";
+                StartAttachWatch();
+                return;
+            }
+
+            lblStatus.Text = "VirtualDJ ya esta abierto. Adjuntando monitor de historial...";
+
+            Task.Delay(wasAlreadyRunning ? 250 : 1800).ContinueWith(t =>
+            {
+                if (this.IsHandleCreated && !this.IsDisposed)
+                    this.BeginInvoke(new Action(AttachToVirtualDj));
+            });
+        }
+
+        private bool IsVirtualDjRunning()
+        {
+            string[] knownNames = new[] { "virtualdj", "virtualdj8", "vdj" };
+            try
+            {
+                foreach (var process in System.Diagnostics.Process.GetProcesses())
+                {
+                    try
+                    {
+                        string name = (process.ProcessName ?? "").ToLowerInvariant();
+                        if (knownNames.Any(token => name.Contains(token)))
+                            return true;
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private void StartAttachWatch()
+        {
+            if (attachTimer != null)
+            {
+                attachTimer.Stop();
+                attachTimer.Tick -= AttachTimer_Tick;
+                attachTimer.Dispose();
+            }
+
+            attachTimer = new Timer();
+            attachTimer.Interval = 2000;
+            attachTimer.Tick += AttachTimer_Tick;
+            attachTimer.Start();
+        }
+
+        private void AttachTimer_Tick(object sender, EventArgs e)
+        {
+            if (!IsVirtualDjRunning()) return;
+            if (attachTimer != null)
+            {
+                attachTimer.Stop();
+                attachTimer.Tick -= AttachTimer_Tick;
+                attachTimer.Dispose();
+                attachTimer = null;
+            }
+
+            if (IsHandleCreated && !IsDisposed)
+                BeginInvoke(new Action(AttachToVirtualDj));
+        }
+
+        private void AttachToVirtualDj()
+        {
+            vdjHistoryFolder = AppSettings.VdjHistoryFolder;
+            string dbPath = AppSettings.VdjDatabaseFile;
+
+            if (!File.Exists(dbPath))
+            {
+                lblNowPlaying.Text = "Error: database.xml no encontrado en " + dbPath;
+                lblStatus.Text = "VirtualDJ detectado, pero falta configurar database.xml.";
+                return;
+            }
+
+            ApplySettings();
+
+            if (!Directory.Exists(vdjHistoryFolder))
+            {
+                lblStatus.Text = "VirtualDJ detectado, pero no existe la carpeta History: " + vdjHistoryFolder;
+                return;
+            }
+
+            Task.Run(() => HistoryEngine.ScanHistory(vdjHistoryFolder));
+            StartHistoryMonitor();
+            lblStatus.Text = IsVirtualDjRunning()
+                ? "VirtualDJ conectado. Esperando la siguiente pista reproducida..."
+                : "Monitor activo. Si VirtualDJ aun esta cargando, reproduce una pista para iniciar.";
+        }
+
         private void ApplyTabVisibility()
         {
             if (mainTabs == null || assistantTab == null || allTracksTab == null) return;
@@ -498,6 +587,15 @@ namespace ArkaiosDJAssistant
                 Task.Run(() => HistoryEngine.ScanHistory(AppSettings.VdjHistoryFolder));
                 
                 StartHistoryMonitor();
+                if (IsVirtualDjRunning())
+                {
+                    BeginInvoke(new Action(AttachToVirtualDj));
+                }
+                else
+                {
+                    lblStatus.Text = "VirtualDJ no esta abierto. Abre VirtualDJ para sincronizar el monitor.";
+                    StartAttachWatch();
+                }
             }
             else
             {
@@ -577,6 +675,12 @@ namespace ArkaiosDJAssistant
 
         private void StartHistoryMonitor()
         {
+            if (historyTimer != null)
+            {
+                historyTimer.Stop();
+                historyTimer.Tick -= CheckHistory;
+                historyTimer.Dispose();
+            }
             historyTimer = new Timer();
             historyTimer.Interval = 2000; // Check every 2 seconds
             historyTimer.Tick += CheckHistory;
