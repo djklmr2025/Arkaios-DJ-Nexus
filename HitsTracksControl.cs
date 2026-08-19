@@ -6,7 +6,8 @@ using System.Drawing;
 using System.IO;
 using System.Net;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using System.Text.Json;
+using Newtonsoft.Json;
 using System.Windows.Forms;
 
 namespace ArkaiosDJAssistant
@@ -17,6 +18,7 @@ namespace ArkaiosDJAssistant
 
         private readonly TextBox queryBox;
         private readonly TextBox playlistBox;
+        private readonly TextBox manualLocationsBox;
         private readonly ComboBox platformBox;
         private readonly ComboBox typeBox;
         private readonly ComboBox qualityBox;
@@ -37,9 +39,17 @@ namespace ArkaiosDJAssistant
             BackColor = Color.FromArgb(20, 20, 20);
             ForeColor = Color.White;
 
-            toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 78, Padding = new Padding(8), WrapContents = true };
+            toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 112, Padding = new Padding(8), WrapContents = true };
             queryBox = new TextBox { Width = 260, Text = "top hits 2026 official audio" };
             playlistBox = new TextBox { Width = 360 };
+            manualLocationsBox = new TextBox
+            {
+                Width = 360,
+                Multiline = true,
+                ScrollBars = ScrollBars.Vertical,
+                Height = 42,
+                Text = "Pega aqui URLs o rutas locales, una por linea."
+            };
             platformBox = new ComboBox { Width = 150, DropDownStyle = ComboBoxStyle.DropDownList };
             platformBox.Items.AddRange(new object[] { "YouTube Hits", "Deezer Chart", "Spotify", "Apple Music", "SoundCloud", "Beatport", "Mixcloud", "Bandcamp" });
             platformBox.SelectedIndex = 0;
@@ -56,9 +66,11 @@ namespace ArkaiosDJAssistant
             downloadAllButton.Click += async (s, e) => await DownloadSelectedAsync(true);
             var playlistButton = new Button { Text = "Extraer playlist", AutoSize = true };
             playlistButton.Click += async (s, e) => await ExtractPlaylistAsync();
+            var injectButton = new Button { Text = "Inyectar ubicaciones", AutoSize = true };
+            injectButton.Click += async (s, e) => await InjectManualLocationsAsync();
             var folderButton = new Button { Text = "Abrir destino", AutoSize = true };
             folderButton.Click += (s, e) => OpenDestination();
-            toolbar.Controls.AddRange(new Control[] { queryBox, platformBox, typeBox, qualityBox, loadButton, downloadSelectedButton, downloadAllButton, folderButton, playlistBox, playlistButton });
+            toolbar.Controls.AddRange(new Control[] { queryBox, platformBox, typeBox, qualityBox, loadButton, downloadSelectedButton, downloadAllButton, folderButton, playlistBox, playlistButton, manualLocationsBox, injectButton });
 
             grid = new DataGridView
             {
@@ -167,6 +179,12 @@ namespace ArkaiosDJAssistant
                 return;
             }
 
+            if (File.Exists(url) && string.Equals(Path.GetExtension(url), ".m3u", StringComparison.OrdinalIgnoreCase))
+            {
+                await LoadLocalPlaylistFileAsync(url);
+                return;
+            }
+
             SetBusy(true, "Extrayendo playlist con API Render y fallback local...", "Extrayendo...");
             OperationProgressDialog progress = new OperationProgressDialog("Extrayendo playlist");
             progress.Show(this);
@@ -210,6 +228,116 @@ namespace ArkaiosDJAssistant
             statusLabel.Text = hits.Count + " elementos extraidos de playlist via " + result.Source + ". Destino: " + AppSettings.GetDownloadFolder(SelectedType);
         }
 
+        private async Task InjectManualLocationsAsync()
+        {
+            string raw = manualLocationsBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(raw) || raw.StartsWith("Pega aqui URLs o rutas locales", StringComparison.OrdinalIgnoreCase))
+            {
+                statusLabel.Text = "Pega una o varias URLs o rutas locales, una por linea.";
+                return;
+            }
+
+            string[] entries = raw.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries);
+            var injected = new List<HitTrack>();
+            foreach (string entry in entries)
+            {
+                string value = entry.Trim();
+                if (string.IsNullOrWhiteSpace(value)) continue;
+                if (File.Exists(value))
+                {
+                    if (string.Equals(Path.GetExtension(value), ".m3u", StringComparison.OrdinalIgnoreCase))
+                    {
+                        injected.AddRange(await ExtractLocalPlaylistRowsAsync(value));
+                    }
+                    else
+                    {
+                        injected.Add(CreateLocalInjectedRow(value));
+                    }
+                    continue;
+                }
+
+                if (value.IndexOf("http", StringComparison.OrdinalIgnoreCase) == 0 || value.IndexOf("youtu", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    PlaylistExtractResult result = await PlaylistExtractorClient.ExtractAsync(value);
+                    if (result != null && result.Success && result.Items.Count > 0)
+                    {
+                        foreach (PlaylistExtractItem item in result.Items)
+                        {
+                            injected.Add(new HitTrack
+                            {
+                                Selected = true,
+                                DownloadType = typeBox.SelectedItem.ToString(),
+                                Title = item.Title,
+                                Artist = item.Uploader,
+                                Source = "Manual " + result.Source,
+                                Duration = string.IsNullOrWhiteSpace(item.Duration) ? "-" : item.Duration,
+                                Url = item.Url,
+                                DownloadQuery = item.Title,
+                                DownloadStatus = "Manual / descargable"
+                            });
+                        }
+                    }
+                }
+            }
+
+            if (injected.Count == 0)
+            {
+                statusLabel.Text = "No se pudo inyectar ninguna ubicacion valida.";
+                return;
+            }
+
+            hits = injected;
+            BindHits();
+            statusLabel.Text = "Ubicaciones manuales cargadas: " + injected.Count + ".";
+        }
+
+        private async Task<List<HitTrack>> ExtractLocalPlaylistRowsAsync(string path)
+        {
+            return await Task.Run(() =>
+            {
+                var rows = new List<HitTrack>();
+                try
+                {
+                    foreach (string line in File.ReadAllLines(path))
+                    {
+                        string value = (line ?? "").Trim();
+                        if (string.IsNullOrWhiteSpace(value) || value.StartsWith("#")) continue;
+                        rows.Add(CreateLocalInjectedRow(value));
+                    }
+                }
+                catch { }
+                return rows;
+            });
+        }
+
+        private async Task LoadLocalPlaylistFileAsync(string path)
+        {
+            SetBusy(true, "Cargando playlist local desde archivo...", "Cargando...");
+            try
+            {
+                hits = await ExtractLocalPlaylistRowsAsync(path);
+                BindHits();
+                statusLabel.Text = "Playlist local cargada: " + hits.Count + " elementos.";
+            }
+            finally { SetBusy(false, null, "Cargar hits"); }
+        }
+
+        private HitTrack CreateLocalInjectedRow(string path)
+        {
+            return new HitTrack
+            {
+                Selected = true,
+                DownloadType = typeBox.SelectedItem.ToString(),
+                Title = Path.GetFileNameWithoutExtension(path),
+                Artist = "",
+                Source = "Manual local",
+                Duration = "-",
+                Url = path,
+                DownloadQuery = Path.GetFileNameWithoutExtension(path),
+                DownloadStatus = "Ruta local inyectada"
+            };
+        }
+
         private async Task<List<HitTrack>> LoadSoundCloudAsync()
         {
             var rows = new List<HitTrack>();
@@ -244,8 +372,7 @@ namespace ArkaiosDJAssistant
                     {
                         client.Encoding = System.Text.Encoding.UTF8;
                         string json = client.DownloadString("https://api.deezer.com/chart/0/tracks?limit=20");
-                        var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-                        var root = serializer.Deserialize<Dictionary<string, object>>(json);
+                        var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
                         object dataObject;
                         if (root == null || !root.TryGetValue("data", out dataObject)) return rows;
                         IEnumerable data = dataObject as IEnumerable;

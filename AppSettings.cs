@@ -17,6 +17,7 @@ namespace ArkaiosDJAssistant
         public static string PreviewAudioDevice { get; set; }
         public static string YouTubeCookiesBrowser { get; set; }
         public static string YouTubeCookiesFile { get; set; }
+        public static string YtDlpCustomPath { get; set; }
         public static List<string> AllowedFolders { get; set; }
 
         public static void AutoDetectVirtualDjPaths()
@@ -111,8 +112,9 @@ namespace ArkaiosDJAssistant
             EnableTransparency = false;
             ShowAdvancedTabs = false;
             PreviewAudioDevice = "Windows default";
-            YouTubeCookiesBrowser = "chrome";
+            YouTubeCookiesBrowser = "";
             YouTubeCookiesFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "youtube-cookies.txt");
+            YtDlpCustomPath = "";
             AllowedFolders = new List<string>();
         }
 
@@ -147,6 +149,10 @@ namespace ArkaiosDJAssistant
                         {
                             YouTubeCookiesFile = line.Substring("youtube_cookies_file=".Length).Trim();
                         }
+                        else if (line.StartsWith("ytdlp_path=", StringComparison.OrdinalIgnoreCase))
+                        {
+                            YtDlpCustomPath = line.Substring("ytdlp_path=".Length).Trim();
+                        }
                         else if (line.StartsWith("show_advanced_tabs=", StringComparison.OrdinalIgnoreCase))
                         {
                             ShowAdvancedTabs = line.Substring("show_advanced_tabs=".Length).Trim() == "1";
@@ -174,6 +180,7 @@ namespace ArkaiosDJAssistant
             lines.AddRange(AllowedFolders);
             lines.Add("youtube_cookies_browser=" + (YouTubeCookiesBrowser ?? ""));
             lines.Add("youtube_cookies_file=" + (YouTubeCookiesFile ?? ""));
+            lines.Add("ytdlp_path=" + (YtDlpCustomPath ?? ""));
             lines.Add("show_advanced_tabs=" + (ShowAdvancedTabs ? "1" : "0"));
             lines.Add("preview_audio_device=" + (PreviewAudioDevice ?? ""));
             File.WriteAllLines(settingsFile, lines.ToArray());

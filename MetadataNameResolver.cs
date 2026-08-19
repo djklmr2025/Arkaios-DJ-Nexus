@@ -8,7 +8,8 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace ArkaiosDJAssistant
 {
@@ -109,8 +110,7 @@ namespace ArkaiosDJAssistant
                     {
                         client.Headers[HttpRequestHeader.UserAgent] = "ARKAIOS-DJ-Assistant/1.0 (local metadata resolver)";
                         string json = client.DownloadString(url);
-                        var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-                        var root = serializer.Deserialize<Dictionary<string, object>>(json);
+                        var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
                         object recordingsObj;
                         if (!root.TryGetValue("recordings", out recordingsObj)) return null;
                         var recordings = ToObjectList(recordingsObj);

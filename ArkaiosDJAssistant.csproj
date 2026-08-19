@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
@@ -7,6 +7,7 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ArkaiosDJ</AssemblyName>
     <RootNamespace>ArkaiosDJAssistant</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
@@ -18,8 +19,16 @@
     <Content Include="config.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <Content Include="yt-dlp.exe">
+    <Content Include="yt-dlp.exe" Condition="Exists('yt-dlp.exe')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <EmbeddedResource Include="yt-dlp.exe" Condition="Exists('yt-dlp.exe')">
+      <LogicalName>ArkaiosDJAssistant.yt-dlp.exe</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="System.Text.Json" Version="10.0.11" />
   </ItemGroup>
 </Project>

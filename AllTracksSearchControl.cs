@@ -483,8 +483,13 @@ namespace ArkaiosDJAssistant
                 string saved = await YouTubeEngine.DownloadAsync(sourceUrl, mediaType, quality);
                 if (string.IsNullOrWhiteSpace(saved) || !File.Exists(saved))
                 {
-                    progress.SetResult("No se pudo descargar.");
-                    statusLabel.Text = "No se pudo descargar desde internet.";
+                    var ytStatus = YouTubeEngine.EnsureYtDlpAvailable();
+                    string errDetail = ytStatus.Available
+                        ? "No se pudo descargar desde internet."
+                        : "No se encontró el complemento yt-dlp.exe. Abre Opciones para vincularlo.";
+                    progress.SetResult(errDetail);
+                    statusLabel.Text = errDetail;
+                    MessageBox.Show(errDetail, "Descarga No Completada", MessageBoxButtons.OK, ytStatus.Available ? MessageBoxIcon.Error : MessageBoxIcon.Warning);
                     return;
                 }
                 string savedType = mediaType == "video" ? "Video" : mediaType == "karaoke" ? "Karaoke" : "Music";

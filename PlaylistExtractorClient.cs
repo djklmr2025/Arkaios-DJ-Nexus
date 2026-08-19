@@ -5,7 +5,8 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace ArkaiosDJAssistant
 {
@@ -61,8 +62,7 @@ namespace ArkaiosDJAssistant
                 try
                 {
                     ForceModernTls();
-                    var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-                    string body = serializer.Serialize(new Dictionary<string, object>
+                    string body = JsonConvert.SerializeObject(new Dictionary<string, object>
                     {
                         { "url", playlistUrl },
                         { "max_duration_minutes", 10 },
@@ -113,9 +113,8 @@ namespace ArkaiosDJAssistant
                 {
                     client.Encoding = Encoding.UTF8;
                     string json = client.DownloadString(ServicesEndpoint);
-                    var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-                    var root = serializer.Deserialize<Dictionary<string, object>>(json);
-                    var services = GetDictionary(root, "services");
+                    var dict = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                    var services = GetDictionary(dict, "services");
                     var playlist = GetDictionary(services, "playlistExtractor");
                     string baseUrl = ToString(playlist, "url").TrimEnd('/');
                     string extractPath = ToString(playlist, "extractPath");
@@ -204,8 +203,7 @@ namespace ArkaiosDJAssistant
                 return result;
             }
 
-            var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-            var root = serializer.Deserialize<Dictionary<string, object>>(json);
+            var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
             if (root == null)
             {
                 result.Error = "JSON invalido.";

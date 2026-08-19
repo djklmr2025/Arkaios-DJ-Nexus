@@ -12,6 +12,10 @@ namespace ArkaiosDJAssistant
         private CheckBox chkAdvancedTabs;
         private ComboBox cboAudioDevice;
         private ListBox lstFolders;
+        private TextBox txtYtDlpPath;
+        private Button btnBrowseYtDlp;
+        private Button btnRelinkYtDlp;
+        private Label lblYtDlpStatus;
 
         public SettingsForm()
         {
@@ -102,11 +106,64 @@ namespace ArkaiosDJAssistant
                 Text = "Detectado VDJ audifonos: " + (string.IsNullOrWhiteSpace(vdjDevice) ? "no detectado" : vdjDevice) + "\nNota: el motor liviano usa Windows default si el reproductor interno no permite ruteo directo.",
                 Location = new Point(20, 200),
                 Width = 520,
-                Height = 60,
+                Height = 40,
                 ForeColor = Color.LightGray,
                 Font = new Font("Segoe UI", 8)
             };
             tabOptions.Controls.Add(lblAudioNote);
+
+            // yt-dlp Complemento Section
+            Label lblYtDlpTitle = new Label { Text = "Complemento de Descargas (yt-dlp.exe)", Font = new Font("Segoe UI", 10, FontStyle.Bold), Location = new Point(20, 245), AutoSize = true };
+            tabOptions.Controls.Add(lblYtDlpTitle);
+
+            txtYtDlpPath = new TextBox
+            {
+                Location = new Point(20, 270),
+                Width = 360,
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.LightGreen,
+                Font = new Font("Segoe UI", 9),
+                Text = AppSettings.YtDlpCustomPath
+            };
+            tabOptions.Controls.Add(txtYtDlpPath);
+
+            btnBrowseYtDlp = new Button
+            {
+                Text = "...",
+                Location = new Point(385, 269),
+                Width = 40,
+                Height = 25,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(50, 50, 50),
+                ForeColor = Color.White
+            };
+            btnBrowseYtDlp.Click += BtnBrowseYtDlp_Click;
+            tabOptions.Controls.Add(btnBrowseYtDlp);
+
+            btnRelinkYtDlp = new Button
+            {
+                Text = "Vincular",
+                Location = new Point(430, 269),
+                Width = 110,
+                Height = 25,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(0, 150, 100),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8, FontStyle.Bold)
+            };
+            btnRelinkYtDlp.Click += BtnRelinkYtDlp_Click;
+            tabOptions.Controls.Add(btnRelinkYtDlp);
+
+            lblYtDlpStatus = new Label
+            {
+                Location = new Point(20, 298),
+                Width = 520,
+                Height = 35,
+                Font = new Font("Segoe UI", 8),
+                ForeColor = Color.LightCyan
+            };
+            tabOptions.Controls.Add(lblYtDlpStatus);
+            UpdateYtDlpStatusLabel();
 
             // Library Tab
             TabPage tabLibrary = new TabPage("Library") { BackColor = Color.FromArgb(30, 30, 30) };
@@ -170,17 +227,60 @@ namespace ArkaiosDJAssistant
             }
         }
 
+        private void BtnBrowseYtDlp_Click(object sender, EventArgs e)
+        {
+            using (var ofd = new OpenFileDialog())
+            {
+                ofd.Filter = "Ejecutable yt-dlp (*yt-dlp*.exe;*.exe)|*yt-dlp*.exe;*.exe|Todos los archivos (*.*)|*.*";
+                ofd.Title = "Seleccionar complemento yt-dlp.exe";
+                if (ofd.ShowDialog() == DialogResult.OK)
+                {
+                    txtYtDlpPath.Text = ofd.FileName;
+                    AppSettings.YtDlpCustomPath = ofd.FileName;
+                    UpdateYtDlpStatusLabel();
+                }
+            }
+        }
+
+        private void BtnRelinkYtDlp_Click(object sender, EventArgs e)
+        {
+            AppSettings.YtDlpCustomPath = txtYtDlpPath.Text.Trim();
+            var status = YouTubeEngine.EnsureYtDlpAvailable();
+            if (status.Available)
+            {
+                txtYtDlpPath.Text = status.Path;
+                AppSettings.YtDlpCustomPath = status.Path;
+                MessageBox.Show(status.StatusMessage, "yt-dlp Vinculado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show(status.StatusMessage, "yt-dlp No Encontrado", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            UpdateYtDlpStatusLabel();
+        }
+
+        private void UpdateYtDlpStatusLabel()
+        {
+            if (lblYtDlpStatus == null) return;
+            AppSettings.YtDlpCustomPath = txtYtDlpPath != null ? txtYtDlpPath.Text.Trim() : "";
+            var status = YouTubeEngine.EnsureYtDlpAvailable();
+            lblYtDlpStatus.Text = status.StatusMessage;
+            lblYtDlpStatus.ForeColor = status.Available ? Color.LightGreen : Color.Tomato;
+        }
+
         private void BtnSave_Click(object sender, EventArgs e)
         {
             AppSettings.EnableTransparency = chkTransparency.Checked;
             AppSettings.ShowAdvancedTabs = chkAdvancedTabs.Checked;
             AppSettings.PreviewAudioDevice = cboAudioDevice.SelectedItem == null ? AudioDeviceCatalog.DefaultDevice : cboAudioDevice.SelectedItem.ToString();
+            AppSettings.YtDlpCustomPath = txtYtDlpPath != null ? txtYtDlpPath.Text.Trim() : "";
             AppSettings.AllowedFolders.Clear();
             foreach (var item in lstFolders.Items)
             {
                 AppSettings.AllowedFolders.Add(item.ToString());
             }
             AppSettings.Save();
+            YouTubeEngine.EnsureYtDlpAvailable();
             this.DialogResult = DialogResult.OK;
             this.Close();
         }

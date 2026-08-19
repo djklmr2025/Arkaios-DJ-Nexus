@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web.Script.Serialization;
+using Newtonsoft.Json;
 
 namespace ArkaiosDJAssistant
 {
@@ -39,8 +39,160 @@ namespace ArkaiosDJAssistant
 
     public static class YouTubeEngine
     {
-        private static readonly string YtDlpPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "yt-dlp.exe");
         private static readonly string ErrorLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "yt-dlp-errors.log");
+        private static string _resolvedYtDlpPath = null;
+
+        public static string GetYtDlpExecutablePath()
+        {
+            return EnsureYtDlpAvailable().Path;
+        }
+
+        public static (bool Available, string Path, string StatusMessage) EnsureYtDlpAvailable()
+        {
+            if (!string.IsNullOrWhiteSpace(AppSettings.YtDlpCustomPath) && File.Exists(AppSettings.YtDlpCustomPath))
+            {
+                _resolvedYtDlpPath = AppSettings.YtDlpCustomPath;
+                return (true, _resolvedYtDlpPath, "✔ Usando ruta personalizada de yt-dlp: " + _resolvedYtDlpPath);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_resolvedYtDlpPath) && File.Exists(_resolvedYtDlpPath))
+            {
+                return (true, _resolvedYtDlpPath, "✔ yt-dlp listo en: " + _resolvedYtDlpPath);
+            }
+
+            string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            string targetLocalPath = Path.Combine(baseDir, "yt-dlp.exe");
+
+            if (File.Exists(targetLocalPath))
+            {
+                _resolvedYtDlpPath = targetLocalPath;
+                return (true, _resolvedYtDlpPath, "✔ yt-dlp listo en carpeta local: " + _resolvedYtDlpPath);
+            }
+
+            string[] fileNames = new[] { "yt-dlp.exe", "ytdl.exe", "yt-dlp", "youtube-dl.exe" };
+            string[] subFolders = new[] { "", "tools", "payload", "dist", "bin", "external" };
+
+            foreach (string sub in subFolders)
+            {
+                string folder = string.IsNullOrEmpty(sub) ? baseDir : Path.Combine(baseDir, sub);
+                foreach (string fn in fileNames)
+                {
+                    string candidate = Path.Combine(folder, fn);
+                    if (File.Exists(candidate))
+                    {
+                        TryAutoCopy(candidate, targetLocalPath);
+                        _resolvedYtDlpPath = File.Exists(targetLocalPath) ? targetLocalPath : candidate;
+                        return (true, _resolvedYtDlpPath, "✔ yt-dlp enlazado desde: " + candidate);
+                    }
+                }
+            }
+
+            DirectoryInfo parent = Directory.GetParent(baseDir);
+            int level = 0;
+            while (parent != null && level < 4)
+            {
+                foreach (string sub in subFolders)
+                {
+                    string folder = string.IsNullOrEmpty(sub) ? parent.FullName : Path.Combine(parent.FullName, sub);
+                    foreach (string fn in fileNames)
+                    {
+                        string candidate = Path.Combine(folder, fn);
+                        if (File.Exists(candidate))
+                        {
+                            TryAutoCopy(candidate, targetLocalPath);
+                            _resolvedYtDlpPath = File.Exists(targetLocalPath) ? targetLocalPath : candidate;
+                            return (true, _resolvedYtDlpPath, "✔ yt-dlp vinculado desde directorio superior: " + candidate);
+                        }
+                    }
+                }
+                parent = parent.Parent;
+                level++;
+            }
+
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string[] commonPaths = new[]
+            {
+                @"C:\ARKAIOS\yt-dlp.exe",
+                @"C:\ARKAIOS\DJ_Assistant\yt-dlp.exe",
+                Path.Combine(localAppData, @"Programs\Arkaios DJ Nexus\yt-dlp.exe"),
+                Path.Combine(localAppData, @"ArkaiosDJNexus\yt-dlp.exe"),
+                Path.Combine(appData, @"ArkaiosDJNexus\yt-dlp.exe")
+            };
+
+            foreach (string path in commonPaths)
+            {
+                if (File.Exists(path))
+                {
+                    TryAutoCopy(path, targetLocalPath);
+                    _resolvedYtDlpPath = File.Exists(targetLocalPath) ? targetLocalPath : path;
+                    return (true, _resolvedYtDlpPath, "✔ yt-dlp vinculado desde sistema: " + path);
+                }
+            }
+
+            try
+            {
+                string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+                foreach (string dir in pathEnv.Split(Path.PathSeparator))
+                {
+                    if (string.IsNullOrWhiteSpace(dir)) continue;
+                    foreach (string fn in fileNames)
+                    {
+                        string candidate = Path.Combine(dir.Trim(), fn);
+                        if (File.Exists(candidate))
+                        {
+                            _resolvedYtDlpPath = candidate;
+                            return (true, _resolvedYtDlpPath, "✔ yt-dlp detectado en PATH del sistema: " + candidate);
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            if (ExtractEmbeddedResource("ArkaiosDJAssistant.yt-dlp.exe", targetLocalPath))
+            {
+                _resolvedYtDlpPath = targetLocalPath;
+                return (true, _resolvedYtDlpPath, "✔ yt-dlp auto-extraído exitosamente desde recurso incrustado en ejecutable.");
+            }
+
+            _resolvedYtDlpPath = targetLocalPath;
+            return (false, targetLocalPath, "⚠ No se encontró el complemento yt-dlp.exe (requerido para descargas).\nColoca yt-dlp.exe en " + baseDir + " o especifícalo en Opciones.");
+        }
+
+        private static void TryAutoCopy(string source, string destination)
+        {
+            try
+            {
+                if (string.Equals(source, destination, StringComparison.OrdinalIgnoreCase)) return;
+                if (!File.Exists(destination))
+                {
+                    File.Copy(source, destination, true);
+                }
+            }
+            catch { }
+        }
+
+        private static bool ExtractEmbeddedResource(string resourceName, string targetPath)
+        {
+            try
+            {
+                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null) return false;
+                    using (var fileStream = File.Create(targetPath))
+                    {
+                        stream.CopyTo(fileStream);
+                    }
+                    return File.Exists(targetPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendError("Fallo extrayendo recurso incrustado " + resourceName + ": " + ex.Message);
+                return false;
+            }
+        }
 
         public static Task<List<YouTubeTrack>> SearchArtistAsync(string artist)
         {
@@ -63,7 +215,7 @@ namespace ArkaiosDJAssistant
         public static async Task<List<YouTubeTrack>> SearchAsync(string query, string mediaType, int limit)
         {
             var tracks = new List<YouTubeTrack>();
-            if (string.IsNullOrWhiteSpace(query) || !File.Exists(YtDlpPath)) return tracks;
+            if (string.IsNullOrWhiteSpace(query) || !EnsureYtDlpAvailable().Available) return tracks;
 
             string suffix = mediaType == "karaoke" ? " karaoke lyrics" : mediaType == "video" ? " official music video" : " official audio";
             string search = "ytsearch" + Math.Max(1, Math.Min(limit, 20)) + ":" + query + suffix;
@@ -72,8 +224,7 @@ namespace ArkaiosDJAssistant
 
             try
             {
-                var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-                var root = serializer.Deserialize<Dictionary<string, object>>(result.Output);
+                var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(result.Output);
                 object entriesObject;
                 if (root == null || !root.TryGetValue("entries", out entriesObject)) return tracks;
                 var entries = entriesObject as IEnumerable;
@@ -132,7 +283,7 @@ namespace ArkaiosDJAssistant
         public static async Task<List<YouTubeTrack>> SearchSoundCloudAsync(string query, int limit)
         {
             var tracks = new List<YouTubeTrack>();
-            if (string.IsNullOrWhiteSpace(query) || !File.Exists(YtDlpPath)) return tracks;
+            if (string.IsNullOrWhiteSpace(query) || !EnsureYtDlpAvailable().Available) return tracks;
 
             string search = "scsearch" + Math.Max(1, Math.Min(limit, 20)) + ":" + query;
             var result = await RunAsync(new[] { "--flat-playlist", "--print", "%(title)s|%(webpage_url)s|%(uploader)s|%(duration_string)s", search });
@@ -160,15 +311,14 @@ namespace ArkaiosDJAssistant
         public static async Task<List<YouTubeTrack>> ExtractPlaylistFlatAsync(string playlistUrl, int limit)
         {
             var tracks = new List<YouTubeTrack>();
-            if (string.IsNullOrWhiteSpace(playlistUrl) || !File.Exists(YtDlpPath)) return tracks;
+            if (string.IsNullOrWhiteSpace(playlistUrl) || !EnsureYtDlpAvailable().Available) return tracks;
 
             var result = await RunAsync(new[] { "--dump-single-json", "--flat-playlist", "--no-warnings", "--playlist-end", Math.Max(1, Math.Min(limit, 50)).ToString(), playlistUrl });
             if (result.ExitCode != 0 || string.IsNullOrWhiteSpace(result.Output)) return tracks;
 
             try
             {
-                var serializer = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
-                var root = serializer.Deserialize<Dictionary<string, object>>(result.Output);
+                var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(result.Output);
                 object entriesObject;
                 if (root == null || !root.TryGetValue("entries", out entriesObject)) return tracks;
                 var entries = entriesObject as IEnumerable;
@@ -205,7 +355,8 @@ namespace ArkaiosDJAssistant
 
         public static async Task<string> DownloadAsync(string url, string mediaType, string quality)
         {
-            if (!File.Exists(YtDlpPath) || string.IsNullOrWhiteSpace(url)) return null;
+            var status = EnsureYtDlpAvailable();
+            if (!status.Available || string.IsNullOrWhiteSpace(url)) return null;
             string folder = AppSettings.GetDownloadFolder(mediaType);
             Directory.CreateDirectory(folder);
             string template = Path.Combine(folder, "%(artist,uploader)s - %(title)s [%(id)s].%(ext)s");
@@ -245,26 +396,69 @@ namespace ArkaiosDJAssistant
                     ProcessResult withCookieFile = Execute(BuildCookieFileArgs(args, cookiesFile));
                     if (withCookieFile.ExitCode == 0) return withCookieFile;
                     AppendError(DateTime.Now + Environment.NewLine + "Fallo usando youtube_cookies_file=" + cookiesFile + Environment.NewLine + withCookieFile.Error);
-                    if (!LooksLikeCookieProblem(withCookieFile.Error)) return withCookieFile;
                 }
 
                 string browser = AppSettings.YouTubeCookiesBrowser;
-                if (!string.IsNullOrWhiteSpace(browser))
+                if (!string.IsNullOrWhiteSpace(browser) && !string.Equals(browser.Trim(), "none", StringComparison.OrdinalIgnoreCase))
                 {
                     ProcessResult withCookies = Execute(BuildCookieArgs(args, browser));
                     if (withCookies.ExitCode == 0) return withCookies;
-                    if (!LooksLikeCookieProblem(withCookies.Error)) return withCookies;
-
                     AppendError(DateTime.Now + Environment.NewLine + "Reintentando sin cookies porque fallo cookies-from-browser " + browser + "." + Environment.NewLine + withCookies.Error);
                 }
 
-                return Execute(args);
+                ProcessResult cleanResult = Execute(BuildCleanArgs(args));
+                if (cleanResult.ExitCode == 0) return cleanResult;
+
+                // Self-healing: si falla por 403 o desactualización, intentar auto-actualizar yt-dlp y reintentar
+                if (LooksLikeUpdateNeeded(cleanResult.Error))
+                {
+                    AppendError(DateTime.Now + Environment.NewLine + "Intentando auto-actualizar yt-dlp (-U) tras fallo: " + cleanResult.Error);
+                    Execute(new[] { "-U" });
+                    return Execute(BuildCleanArgs(args));
+                }
+
+                return cleanResult;
             });
+        }
+
+        private static string[] BuildCleanArgs(string[] args)
+        {
+            var list = new List<string>();
+            list.Add("--no-cookies");
+            list.AddRange(args);
+            return list.ToArray();
+        }
+
+        private static bool LooksLikeUpdateNeeded(string error)
+        {
+            if (string.IsNullOrWhiteSpace(error)) return false;
+            return error.IndexOf("403", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("Forbidden", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("SABR", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("outdated", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("update", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static ProcessResult Execute(string[] args)
         {
-            var psi = new ProcessStartInfo { FileName = YtDlpPath, UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
+            var status = EnsureYtDlpAvailable();
+            if (!status.Available)
+            {
+                string err = "ERROR: Complemento yt-dlp.exe no disponible. " + status.StatusMessage;
+                AppendError(err);
+                return new ProcessResult { ExitCode = -1, Output = "", Error = err };
+            }
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = status.Path,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
+            };
             psi.Arguments = JoinArguments(args);
             using (var process = Process.Start(psi))
             {
@@ -302,7 +496,12 @@ namespace ArkaiosDJAssistant
                    error.IndexOf("browser", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    error.IndexOf("chrome", StringComparison.OrdinalIgnoreCase) >= 0 ||
                    error.IndexOf("edge", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                   error.IndexOf("firefox", StringComparison.OrdinalIgnoreCase) >= 0;
+                   error.IndexOf("firefox", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("dpapi", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("decrypt", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("keyring", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("sqlite", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   error.IndexOf("locked", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private static string ToString(Dictionary<string, object> value, string key) { object raw; return value.TryGetValue(key, out raw) && raw != null ? raw.ToString() : ""; }

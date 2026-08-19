@@ -230,10 +230,15 @@ namespace ArkaiosDJAssistant
             finally { SetBusy(false, null, null, null); }
             if (string.IsNullOrEmpty(saved))
             {
-                progress.SetResult("Resultado: descarga fallida. Revisa yt-dlp-errors.log.");
+                var ytStatus = YouTubeEngine.EnsureYtDlpAvailable();
+                string errDetail = ytStatus.Available
+                    ? "La descarga falló. Revisa yt-dlp-errors.log."
+                    : "No se encontró el complemento yt-dlp.exe.\nAbre Opciones en la barra superior para vincular o descargar el complemento.";
+                progress.SetResult("Resultado: descarga fallida.\n" + errDetail);
                 progress.Close();
                 progress.Dispose();
-                statusLabel.Text = "La descarga falló; consulta yt-dlp-errors.log.";
+                statusLabel.Text = errDetail;
+                MessageBox.Show(errDetail, "Descarga No Completada", MessageBoxButtons.OK, ytStatus.Available ? MessageBoxIcon.Error : MessageBoxIcon.Warning);
                 return;
             }
 
