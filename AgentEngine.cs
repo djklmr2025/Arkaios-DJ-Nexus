@@ -139,7 +139,7 @@ namespace ArkaiosDJAssistant
         {
             statusCallback?.Invoke("🤖 Agente ARKAIOS: Consultando inteligencia conversacional...");
 
-            // 1. Intentar llamar al endpoint de IA en vivo (Local Gemini-Lab o servidor de IA)
+            // 1. Intentar llamar al endpoint de IA en vivo (Local Gemini-Lab)
             string liveAiAnswer = await FetchLiveAiResponseAsync(input);
             if (!string.IsNullOrWhiteSpace(liveAiAnswer))
             {
@@ -156,8 +156,8 @@ namespace ArkaiosDJAssistant
                 };
             }
 
-            // 2. Motor Conversacional Abierto Multitemático (Abierto a Cualquier Tema)
-            await Task.Delay(200);
+            // 2. Motor Conversacional Inteligente Directo (Sin respuestas genéricas repetitivas)
+            await Task.Delay(150);
             
             string rawLower = input.ToLowerInvariant();
             string normText = Regex.Replace(rawLower, @"[^a-z0-9\s]", " ");
@@ -167,13 +167,31 @@ namespace ArkaiosDJAssistant
             reply.AppendLine("🤖 **AGENTE ARKAIOS:**");
             reply.AppendLine();
 
-            // Intención A: Ranking DJs / Top 1 / Artistas Electrónicos
-            bool isTopDjQuery = normText.Contains("1") || normText.Contains("top") || normText.Contains("famoso") || 
-                                normText.Contains("ranking") || normText.Contains("lider") || normText.Contains("mejor") || 
-                                normText.Contains("popular") || normText.Contains("guetta") || normText.Contains("garrix") || 
-                                normText.Contains("mag") || (normText.Contains("dj") && (normText.Contains("quien") || normText.Contains("cual")));
-
-            if (isTopDjQuery)
+            // A) Tiësto Especifico
+            if (normText.Contains("tiesto") || normText.Contains("tiësto"))
+            {
+                reply.AppendLine("🎧 **Información sobre DJ Tiësto:**");
+                reply.AppendLine();
+                reply.AppendLine("• **Posición Actual:** Tiësto (Tijs Verwest) se mantiene en el **Top 25 Mundial de DJ Mag** (actualmente posición #23 en el ranking 2024) y sigue siendo uno de los DJs estelares con mayor facturación y presencia como headliner en festivales como Tomorrowland, Ultra Music Festival y EDC Las Vegas.");
+                reply.AppendLine("• **Legado Inigualable:** Fue votado **el DJ #1 del Mundo durante 3 años consecutivos** (2002, 2003, 2004) y fue coronado por la revista DJ Mag como *'The Greatest DJ of All Time'*.");
+                reply.AppendLine("• **Hits Legendarios y Actuales:** Es pionero del género Trance (*Adagio for Strings*, *Lethal Industry*, *Traffic*) y referente del EDM / Dance Pop comercial (*The Business*, *10:35*, *Don't Be Shy*).");
+                reply.AppendLine();
+                reply.AppendLine("💡 *Tip:* Si deseas descargar cualquier canción, remix o video de Tiësto, dime *'bájame Tiësto - The Business'* o *'descarga el video de Tiësto Adagio for Strings'* y lo guardaré en Verde Neón.");
+            }
+            // B) Armin van Buuren
+            else if (normText.Contains("armin") || normText.Contains("buuren"))
+            {
+                reply.AppendLine("🎧 **Información sobre Armin van Buuren:**");
+                reply.AppendLine();
+                reply.AppendLine("• **Posición Actual:** Se ubica actualmente en el puesto **#5 Global** en el DJ Mag Top 100.");
+                reply.AppendLine("• **Récord Histórico:** Es el único DJ en la historia que ha ganado **5 veces el puesto #1 del Mundo** (2007, 2008, 2009, 2010 y 2012).");
+                reply.AppendLine("• **A State of Trance:** Es el creador y locutor del show de radio semanal *A State of Trance (ASOT)* con más de 1100 episodios transmitidos a nivel global.");
+            }
+            // C) Ranking General de DJs / Top #1 / Garrix & Guetta
+            else if (normText.Contains("1") || normText.Contains("top") || normText.Contains("ranking") || 
+                     normText.Contains("lider") || normText.Contains("mejor") || normText.Contains("popular") || 
+                     normText.Contains("guetta") || normText.Contains("garrix") || normText.Contains("mag") || 
+                     (normText.Contains("dj") && (normText.Contains("quien") || normText.Contains("cual") || normText.Contains("donde") || normText.Contains("posicion") || normText.Contains("puesto"))))
             {
                 reply.AppendLine("🏆 **Top DJs Mundiales e Información de la Escena:**");
                 reply.AppendLine("El **DJ número #1 del mundo actualmente** (según el ranking oficial **DJ Mag Top 100 DJs** y la presencia en festivales como Tomorrowland, Ultra Music Festival y EDC) se disputa entre:");
@@ -182,6 +200,7 @@ namespace ArkaiosDJAssistant
                 reply.AppendLine("• ⚡ **Top 5 Global:** Martin Garrix, David Guetta, Dimitri Vegas & Like Mike, Alok y Armin van Buuren.");
                 reply.AppendLine("• 🔥 **Especialistas por Género:** Charlotte de Witte y Amelie Lens (Techno), Fisher y Michael Bibi (Tech House), Tale Of Us y Anyma (Melodic Techno).");
             }
+            // D) BPMs / Tempos
             else if (normText.Contains("bpm") || normText.Contains("tempo") || normText.Contains("velocidad") || normText.Contains("compas"))
             {
                 reply.AppendLine("⏱️ **Guía de Tempos y BPMs para DJs:**");
@@ -190,6 +209,7 @@ namespace ArkaiosDJAssistant
                 reply.AppendLine("• **House / Dance / EDM:** 120 - 128 BPM (zona estándar para mezclas largas).");
                 reply.AppendLine("• **Tech House / Techno:** 124 - 130 BPM (enfoque en ecualización de bajos).");
             }
+            // E) Camelot Wheel / Mezcla Armónica
             else if (normText.Contains("camelot") || normText.Contains("key") || normText.Contains("tonalidad") || normText.Contains("armon"))
             {
                 reply.AppendLine("🎹 **Reglas de Mezcla Armónica (Camelot Wheel):**");
@@ -197,19 +217,17 @@ namespace ArkaiosDJAssistant
                 reply.AppendLine("• **Cambio Modal (ej: 8A -> 8B):** Transición alegre de Menor a Mayor.");
                 reply.AppendLine("• **Quinta Justa (ej: 8A -> 9A / 7A):** Movimiento natural de 1 hora en la rueda.");
             }
+            // F) Saludos / Estado
             else if (normText.Contains("vivo") || normText.Contains("quien eres") || normText.Contains("hola") || normText.Contains("buenas"))
             {
                 reply.AppendLine("¡Hola! 👋 Estoy 100% activo y listo para ayudarte en lo que necesites.");
-                reply.AppendLine("Puedes hacerme preguntas de **cualquier temática** (ciencia, cultura general, tecnología, música o consejos), y mi función estrella es ayudarte a **obtener y descargar cualquier canción, video o karaoke** automáticamente.");
+                reply.AppendLine("Puedes hacerme preguntas de **cualquier temática** (música, DJs, ciencia, tecnología o consejos), y mi función estrella es ayudarte a **obtener y descargar cualquier canción, video o karaoke** automáticamente.");
             }
+            // G) Cualquier otra consulta general
             else
             {
-                // Respuesta abierta multi-temática fluida sin encajonar a un único tema
-                reply.AppendLine("Sobre tu consulta acerca de: *" + input + "*");
-                reply.AppendLine();
-                reply.AppendLine("Entendido. Puedes preguntarme sobre **cualquier tema general**, concepto, duda o recomendación que necesites.");
-                reply.AppendLine();
-                reply.AppendLine("• Si tu consulta está relacionada con **obtener alguna pista musical, video o karaoke**, solo dímelo directamente (por ejemplo: *'bájame " + CleanSearchQuery(input) + "'* o *'descarga el video de " + CleanSearchQuery(input) + "'*) y me encargaré de traerlo a tus descargas recientes en **Verde Neón**.");
+                reply.AppendLine("¡Entendido! Puedo ayudarte con información sobre cualquier artista, concepto musical, técnica o duda general.");
+                reply.AppendLine("Si deseas información sobre una canción o DJ específico, solo dime su nombre o pídeme directamente *'bájame [canción]'* o *'descarga el video de [artista]'* y lo traeré para ti.");
             }
 
             reply.AppendLine();
@@ -247,7 +265,7 @@ namespace ArkaiosDJAssistant
             }
             catch
             {
-                // Silenciosamente continuar al fallback si el endpoint no está activo
+                // Silenciosamente continuar al motor directo si el endpoint no está activo
             }
             return null;
         }
