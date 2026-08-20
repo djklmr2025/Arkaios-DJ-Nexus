@@ -76,6 +76,7 @@ if exist "%~dp0bin\Release\ArkaiosDJ.exe" (
     xcopy /y /e /i /q "%~dp0bin\Release\*" "%~dp0installer\payload\"
 )
 if exist "%~dp0yt-dlp.exe" copy /y "%~dp0yt-dlp.exe" "%~dp0installer\payload\yt-dlp.exe"
+if exist "%~dp0installer\payload\yt-dlp.exe" copy /y "%~dp0installer\payload\yt-dlp.exe" "%~dp0yt-dlp.exe"
 if exist "%~dp0config.txt" copy /y "%~dp0config.txt" "%~dp0installer\payload\config.txt"
 echo [OK] Payload completo del instalador sincronizado con todas las DLLs y dependencias.
 

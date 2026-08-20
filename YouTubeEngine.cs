@@ -70,7 +70,7 @@ namespace ArkaiosDJAssistant
             }
 
             string[] fileNames = new[] { "yt-dlp.exe", "ytdl.exe", "yt-dlp", "youtube-dl.exe" };
-            string[] subFolders = new[] { "", "tools", "payload", "dist", "bin", "external" };
+            string[] subFolders = new[] { "", "tools", "payload", @"installer\payload", "dist", "bin", "external" };
 
             foreach (string sub in subFolders)
             {
@@ -115,6 +115,7 @@ namespace ArkaiosDJAssistant
             {
                 @"C:\ARKAIOS\yt-dlp.exe",
                 @"C:\ARKAIOS\DJ_Assistant\yt-dlp.exe",
+                @"C:\ARKAIOS\DJ_Assistant\installer\payload\yt-dlp.exe",
                 Path.Combine(localAppData, @"Programs\Arkaios DJ Nexus\yt-dlp.exe"),
                 Path.Combine(localAppData, @"ArkaiosDJNexus\yt-dlp.exe"),
                 Path.Combine(appData, @"ArkaiosDJNexus\yt-dlp.exe")
