@@ -124,8 +124,9 @@ namespace ArkaiosDJAssistant
         private DownloadHubControl downloadHub;
         private TabControl mainTabs;
         private TabPage assistantTab;
-        private TabPage allTracksTab;
         private TabPage mediaTab;
+        private TabPage agentTab;
+        private TabPage allTracksTab;
         private TabPage hitsTab;
         private TabPage hubTab;
         private TabPage organizerTab;
@@ -151,8 +152,9 @@ namespace ArkaiosDJAssistant
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             mainTabs = new TabControl { Dock = DockStyle.Fill };
             assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
-            allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
             mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
+            agentTab = new TabPage("Usar al Agente DJ Assistant") { BackColor = Color.FromArgb(20, 20, 20) };
+            allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
             hitsTab = new TabPage("Hits / Plataformas") { BackColor = Color.FromArgb(20, 20, 20) };
             hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
             organizerTab = new TabPage("Organizador IA / Renombrador") { BackColor = Color.FromArgb(20, 20, 20) };
@@ -164,6 +166,9 @@ namespace ArkaiosDJAssistant
             mediaSearch.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
             mediaSearch.TrackViewRequested += path => AddTrackToHub(path, true);
             mediaTab.Controls.Add(mediaSearch);
+            var agentControl = new AgentDjControl();
+            agentControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            agentTab.Controls.Add(agentControl);
             var hitsControl = new HitsTracksControl();
             hitsControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
             hitsTab.Controls.Add(hitsControl);
@@ -573,6 +578,7 @@ namespace ArkaiosDJAssistant
             mainTabs.TabPages.Clear();
             mainTabs.TabPages.Add(assistantTab);
             mainTabs.TabPages.Add(mediaTab);
+            if (agentTab != null) mainTabs.TabPages.Add(agentTab);
             mainTabs.TabPages.Add(allTracksTab);
             if (AppSettings.ShowAdvancedTabs)
             {
