@@ -9,7 +9,13 @@ if not exist "%ISCC%" (
   exit /b 3
 )
 if not exist "installer\payload" mkdir "installer\payload"
-if exist "ArkaiosDJ.exe" copy /y "ArkaiosDJ.exe" "installer\payload\ArkaiosDJ.exe"
+if exist "bin\Release\ArkaiosDJ.exe" (
+  xcopy /y /e /i /q "bin\Release\*" "installer\payload\"
+) else if exist "ArkaiosDJ.dll" (
+  copy /y "*.dll" "installer\payload\"
+  copy /y "*.json" "installer\payload\"
+  copy /y "ArkaiosDJ.exe" "installer\payload\"
+)
 if exist "yt-dlp.exe" copy /y "yt-dlp.exe" "installer\payload\yt-dlp.exe"
 if exist "config.txt" copy /y "config.txt" "installer\payload\config.txt"
 

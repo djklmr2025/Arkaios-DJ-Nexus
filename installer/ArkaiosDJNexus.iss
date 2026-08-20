@@ -30,9 +30,7 @@ Name: "spanish"; MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "desktopicon"; Description: "Crear un acceso directo en el escritorio"; GroupDescription: "Accesos directos:"; Flags: unchecked
 
 [Files]
-Source: "payload\ArkaiosDJ.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "payload\yt-dlp.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "payload\config.txt"; DestDir: "{app}"; Flags: onlyifdoesntexist
+Source: "payload\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "payload\Validate-ArkaiosLicense.ps1"; Flags: dontcopy
 
 [Icons]

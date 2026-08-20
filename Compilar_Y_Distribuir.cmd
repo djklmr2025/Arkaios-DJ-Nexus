@@ -66,16 +66,18 @@ echo [OK] Compilacion exitosa.
 
 :: ---- Copiar binarios al raiz del proyecto ----
 if exist "%~dp0bin\Release\ArkaiosDJ.exe" (
-    copy /y "%~dp0bin\Release\ArkaiosDJ.exe" "%~dp0ArkaiosDJ.exe"
-    echo [OK] ArkaiosDJ.exe actualizado en raiz del proyecto.
+    xcopy /y /e /i /q "%~dp0bin\Release\*" "%~dp0"
+    echo [OK] Binarios y dependencias actualizadas en raiz del proyecto.
 )
 
 :: ---- Sincronizar payload del instalador ----
 if not exist "%~dp0installer\payload" mkdir "%~dp0installer\payload"
-if exist "%~dp0ArkaiosDJ.exe"  copy /y "%~dp0ArkaiosDJ.exe"  "%~dp0installer\payload\ArkaiosDJ.exe"
-if exist "%~dp0yt-dlp.exe"     copy /y "%~dp0yt-dlp.exe"     "%~dp0installer\payload\yt-dlp.exe"
-if exist "%~dp0config.txt"     copy /y "%~dp0config.txt"     "%~dp0installer\payload\config.txt"
-echo [OK] Payload del instalador sincronizado.
+if exist "%~dp0bin\Release\ArkaiosDJ.exe" (
+    xcopy /y /e /i /q "%~dp0bin\Release\*" "%~dp0installer\payload\"
+)
+if exist "%~dp0yt-dlp.exe" copy /y "%~dp0yt-dlp.exe" "%~dp0installer\payload\yt-dlp.exe"
+if exist "%~dp0config.txt" copy /y "%~dp0config.txt" "%~dp0installer\payload\config.txt"
+echo [OK] Payload completo del instalador sincronizado con todas las DLLs y dependencias.
 
 :: ---- Crear instalador ----
 set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
