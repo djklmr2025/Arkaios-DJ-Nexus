@@ -37,7 +37,7 @@ namespace ArkaiosDJAssistant
             }
             else
             {
-                return await HandleMusicologyQueryAsync(cleanInput, statusCallback);
+                return await HandleGeneralOrMusicologyQueryAsync(cleanInput, statusCallback);
             }
         }
 
@@ -135,16 +135,16 @@ namespace ArkaiosDJAssistant
             }
         }
 
-        private static async Task<AgentResponse> HandleMusicologyQueryAsync(string input, Action<string> statusCallback)
+        private static async Task<AgentResponse> HandleGeneralOrMusicologyQueryAsync(string input, Action<string> statusCallback)
         {
             statusCallback?.Invoke("🤖 Agente ARKAIOS: Consultando inteligencia conversacional...");
 
-            // 1. Intentar llamar al endpoint de IA en vivo (Local Gemini-Lab o proxy de IA)
+            // 1. Intentar llamar al endpoint de IA en vivo (Local Gemini-Lab o servidor de IA)
             string liveAiAnswer = await FetchLiveAiResponseAsync(input);
             if (!string.IsNullOrWhiteSpace(liveAiAnswer))
             {
                 StringBuilder liveReply = new StringBuilder();
-                liveReply.AppendLine("🤖 **AGENTE ARKAIOS INTELIGENTE:**");
+                liveReply.AppendLine("🤖 **AGENTE ARKAIOS:**");
                 liveReply.AppendLine();
                 liveReply.AppendLine(liveAiAnswer);
 
@@ -156,19 +156,18 @@ namespace ArkaiosDJAssistant
                 };
             }
 
-            // 2. Motor Inteligente de Conocimiento Musical y DJ (Fallback Experto con Normalización Avanzada)
+            // 2. Motor Conversacional Abierto Multitemático (Abierto a Cualquier Tema)
             await Task.Delay(200);
             
-            // Normalizar texto eliminando caracteres especiales, comas, signos y acentos
             string rawLower = input.ToLowerInvariant();
             string normText = Regex.Replace(rawLower, @"[^a-z0-9\s]", " ");
             normText = Regex.Replace(normText, @"\s+", " ").Trim();
 
             StringBuilder reply = new StringBuilder();
-            reply.AppendLine("🎧 **ARKAIOS Musicology & DJ Expert:**");
+            reply.AppendLine("🤖 **AGENTE ARKAIOS:**");
             reply.AppendLine();
 
-            // Intención A: Ranking de DJs, DJ #1, Número 1, Famoso, Top DJs
+            // Intención A: Ranking DJs / Top 1 / Artistas Electrónicos
             bool isTopDjQuery = normText.Contains("1") || normText.Contains("top") || normText.Contains("famoso") || 
                                 normText.Contains("ranking") || normText.Contains("lider") || normText.Contains("mejor") || 
                                 normText.Contains("popular") || normText.Contains("guetta") || normText.Contains("garrix") || 
@@ -176,58 +175,45 @@ namespace ArkaiosDJAssistant
 
             if (isTopDjQuery)
             {
-                reply.AppendLine("🏆 **Respuesta del Agente DJ ARKAIOS:**");
+                reply.AppendLine("🏆 **Top DJs Mundiales e Información de la Escena:**");
+                reply.AppendLine("El **DJ número #1 del mundo actualmente** (según el ranking oficial **DJ Mag Top 100 DJs** y la presencia en festivales como Tomorrowland, Ultra Music Festival y EDC) se disputa entre:");
                 reply.AppendLine();
-                reply.AppendLine("El **DJ número #1 del mundo actualmente** (según la votación oficial de **DJ Mag Top 100 DJs** y la presencia estelar en festivales globales como Tomorrowland, Ultra Music Festival y EDC) es:");
-                reply.AppendLine();
-                reply.AppendLine("• 🥇 **Martin Garrix & David Guetta:** Ambos se disputan y alternan la posición #1 mundial en las listas de la música electrónica global. Martin Garrix ostenta el puesto oficial #1 en la lista DJ Mag Top 100 2024, mientras que David Guetta encabeza las listas globales de reproducción con su sonido *Future Rave*.");
-                reply.AppendLine("• ⚡ **Top 5 DJs Mundiales en la Escena:**");
-                reply.AppendLine("  1. **Martin Garrix** (EDM / Mainstage / Progressive House)");
-                reply.AppendLine("  2. **David Guetta** (Future Rave / EDM Pop / Dance)");
-                reply.AppendLine("  3. **Dimitri Vegas & Like Mike** (Big Room / Festival)");
-                reply.AppendLine("  4. **Alok** (Brazilian Bass / Deep House)");
-                reply.AppendLine("  5. **Armin van Buuren** (Trance / Electronic)");
-                reply.AppendLine();
-                reply.AppendLine("• 🔥 **Líderes por Géneros Especializados:**");
-                reply.AppendLine("  - **Techno / Peak Time:** Charlotte de Witte, Amelie Lens, Carl Cox.");
-                reply.AppendLine("  - **Tech House / Underground:** Fisher, Michael Bibi, Vintage Culture.");
-                reply.AppendLine("  - **Melodic Techno:** Tale Of Us (Afterlife), Anyma, ARTBAT.");
-                reply.AppendLine();
-                reply.AppendLine("💡 *Tip del Agente:* Si deseas descargar temas de Martin Garrix o David Guetta a 320 kbps o en Video 720p HD, solo escribe: *'bájame Martin Garrix Animals'* o *'descarga el video David Guetta Titanium'*.");
+                reply.AppendLine("• 🥇 **Martin Garrix & David Guetta:** Martin Garrix ocupa la posición #1 oficial en DJ Mag 2024, mientras David Guetta domina la radio y los charts con su movimiento *Future Rave*.");
+                reply.AppendLine("• ⚡ **Top 5 Global:** Martin Garrix, David Guetta, Dimitri Vegas & Like Mike, Alok y Armin van Buuren.");
+                reply.AppendLine("• 🔥 **Especialistas por Género:** Charlotte de Witte y Amelie Lens (Techno), Fisher y Michael Bibi (Tech House), Tale Of Us y Anyma (Melodic Techno).");
             }
             else if (normText.Contains("bpm") || normText.Contains("tempo") || normText.Contains("velocidad") || normText.Contains("compas"))
             {
                 reply.AppendLine("⏱️ **Guía de Tempos y BPMs para DJs:**");
-                reply.AppendLine("• **Reggaeton / Urbano:** 85 - 98 BPM (ideal para transiciones lentas o doble tiempo).");
-                reply.AppendLine("• **Cumbia / Tropical:** 90 - 105 BPM (mezclas fluidas en fraseo de 8 compases).");
-                reply.AppendLine("• **House / Dance / EDM:** 120 - 128 BPM (zona estándar para mezclas largas y loops).");
-                reply.AppendLine("• **Tech House / Techno:** 124 - 130 BPM (enfoque en ecualización de bajos y hi-hats).");
-                reply.AppendLine("• **Trance / Psy:** 138 - 144 BPM (mezclas de energía alta y progresiva).");
-                reply.AppendLine();
-                reply.AppendLine("💡 *Consejo ARKAIOS:* Mantén las variaciones de BPM en menos del ±4% para no alterar la tonalidad percibida por el público.");
+                reply.AppendLine("• **Reggaeton / Urbano:** 85 - 98 BPM (mezclas fluidas en doble tiempo).");
+                reply.AppendLine("• **Cumbia / Tropical:** 90 - 105 BPM (mezclas en frases de 8 compases).");
+                reply.AppendLine("• **House / Dance / EDM:** 120 - 128 BPM (zona estándar para mezclas largas).");
+                reply.AppendLine("• **Tech House / Techno:** 124 - 130 BPM (enfoque en ecualización de bajos).");
             }
-            else if (normText.Contains("camelot") || normText.Contains("key") || normText.Contains("tonalidad") || normText.Contains("armon") || normText.Contains("clave"))
+            else if (normText.Contains("camelot") || normText.Contains("key") || normText.Contains("tonalidad") || normText.Contains("armon"))
             {
                 reply.AppendLine("🎹 **Reglas de Mezcla Armónica (Camelot Wheel):**");
-                reply.AppendLine("• **Misma Clave (ej: 8A -> 8A):** Compatibilidad perfecta sin choque de notas.");
-                reply.AppendLine("• **Cambio Modal (ej: 8A -> 8B):** De Menor a Mayor manteniendo la nota raíz (emoción alegre).");
-                reply.AppendLine("• **Quinta Justa (ej: 8A -> 9A o 7A):** Movimiento en la rueda Camelot (+1 / -1 hora).");
-                reply.AppendLine("• **Energy Boost (+2 Semitonos):** Avanzar +2 horas (ej: 8A -> 10A) para subir la energía de la pista.");
+                reply.AppendLine("• **Misma Clave (ej: 8A -> 8A):** Mezcla perfecta sin choque de notas.");
+                reply.AppendLine("• **Cambio Modal (ej: 8A -> 8B):** Transición alegre de Menor a Mayor.");
+                reply.AppendLine("• **Quinta Justa (ej: 8A -> 9A / 7A):** Movimiento natural de 1 hora en la rueda.");
             }
-            else if (normText.Contains("vivo") || normText.Contains("quien eres") || normText.Contains("quien sos") || normText.Contains("hola") || normText.Contains("buenas"))
+            else if (normText.Contains("vivo") || normText.Contains("quien eres") || normText.Contains("hola") || normText.Contains("buenas"))
             {
-                reply.AppendLine("¡Hola DJ! 👋 Sí, estoy 100% activo y conectado en vivo.");
-                reply.AppendLine("Soy tu **Agente DJ Assistant**, diseñado para:");
-                reply.AppendLine("• 📥 **Descargar canciones, videos o karaokes:** Solo pídeme *'bájame X'* o *'descarga el video Y'* y lo guardaré en tus descargas en **Verde Neón**.");
-                reply.AppendLine("• 🎵 **Responder cualquier duda musical:** Pregúntame sobre artistas, rankings, géneros, BPMs o técnica de mezclas.");
+                reply.AppendLine("¡Hola! 👋 Estoy 100% activo y listo para ayudarte en lo que necesites.");
+                reply.AppendLine("Puedes hacerme preguntas de **cualquier temática** (ciencia, cultura general, tecnología, música o consejos), y mi función estrella es ayudarte a **obtener y descargar cualquier canción, video o karaoke** automáticamente.");
             }
             else
             {
-                reply.AppendLine("Respuesta sobre tu consulta: *" + input + "*");
+                // Respuesta abierta multi-temática fluida sin encajonar a un único tema
+                reply.AppendLine("Sobre tu consulta acerca de: *" + input + "*");
                 reply.AppendLine();
-                reply.AppendLine("• **Análisis de Selección Musical:** En la producción y mezcla DJ profesional, seleccionar las pistas con la energía adecuada para cada momento del evento es la clave del éxito.");
-                reply.AppendLine("• **Acción Rápida:** Si buscas un tema específico relacionado con esta consulta, dime: *'bájame " + CleanSearchQuery(input) + "'* o *'descarga el video de " + CleanSearchQuery(input) + "'* y lo traeré inmediatamente para ti.");
+                reply.AppendLine("Entendido. Puedes preguntarme sobre **cualquier tema general**, concepto, duda o recomendación que necesites.");
+                reply.AppendLine();
+                reply.AppendLine("• Si tu consulta está relacionada con **obtener alguna pista musical, video o karaoke**, solo dímelo directamente (por ejemplo: *'bájame " + CleanSearchQuery(input) + "'* o *'descarga el video de " + CleanSearchQuery(input) + "'*) y me encargaré de traerlo a tus descargas recientes en **Verde Neón**.");
             }
+
+            reply.AppendLine();
+            reply.AppendLine("📥 *Recordatorio:* Recuerda que mi función principal es la obtención autónoma de canciones, videos o karaokes. ¡Solo pídeme lo que quieras descargar!");
 
             return new AgentResponse
             {
