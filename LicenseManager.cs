@@ -78,12 +78,10 @@ namespace ArkaiosDJAssistant
                     return false;
                 }
 
-                // Check for updates matching CURRENT_VERSION ("v1.3.0")
-                if (response.Contains("\"latestVersion\":") && !response.Contains("\"latestVersion\": \"" + CURRENT_VERSION + "\""))
+                // Check for updates using Semantic Version comparison (vServer > vCurrent)
+                string latestVersionStr = ExtractJsonField(response, "latestVersion");
+                if (!string.IsNullOrEmpty(latestVersionStr) && IsNewerVersion(latestVersionStr, CURRENT_VERSION))
                 {
-                    string latestVersionStr = ExtractJsonField(response, "latestVersion");
-                    if (string.IsNullOrEmpty(latestVersionStr)) latestVersionStr = "nueva versión";
-
                     var result = System.Windows.Forms.MessageBox.Show(
                         "¡Hay una actualización de Arkaios DJ Nexus disponible (" + latestVersionStr + ")!\n\nTu versión instalada actual es " + CURRENT_VERSION + ".\n\n¿Deseas descargar e instalar automáticamente la nueva versión ahora?", 
                         "Actualización Disponible", 
@@ -98,6 +96,27 @@ namespace ArkaiosDJAssistant
             }
 
             return true;
+        }
+
+        private static bool IsNewerVersion(string serverVersionStr, string currentVersionStr)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(serverVersionStr)) return false;
+
+                string cleanServer = serverVersionStr.TrimStart('v', 'V').Trim();
+                string cleanCurrent = currentVersionStr.TrimStart('v', 'V').Trim();
+
+                Version vServer;
+                Version vCurrent;
+
+                if (Version.TryParse(cleanServer, out vServer) && Version.TryParse(cleanCurrent, out vCurrent))
+                {
+                    return vServer > vCurrent;
+                }
+            }
+            catch {}
+            return false;
         }
 
         private static string ExtractJsonField(string json, string fieldName)
