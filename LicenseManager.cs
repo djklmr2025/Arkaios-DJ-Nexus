@@ -8,6 +8,7 @@ namespace ArkaiosDJAssistant
 {
     public static class LicenseManager
     {
+        public const string CURRENT_VERSION = "v1.3.0";
         private static string licenseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ArkaiosDJNexus");
         private static string licensePath = Path.Combine(licenseDir, "license.key");
         private const string SALT = "ARKAIOS_SECRET_KEY_2026_NEXUS";
@@ -41,7 +42,7 @@ namespace ArkaiosDJAssistant
             string URL_SECUNDARIA = "https://servidor-arkaios-api.vercel.app/api/licenses/validate"; 
 
             string hwid = GetHardwareId();
-            string jsonPayload = string.Format("{{\"key\":\"{0}\", \"hwid\":\"{1}\"}}", key, hwid);
+            string jsonPayload = string.Format("{{\"key\":\"{0}\", \"hwid\":\"{1}\", \"currentVersion\":\"{2}\"}}", key, hwid, CURRENT_VERSION);
             string response = "";
             bool connectionSuccess = false;
 
@@ -77,25 +78,97 @@ namespace ArkaiosDJAssistant
                     return false;
                 }
 
-                // Check for updates
-                if (response.Contains("\"latestVersion\":") && !response.Contains("\"latestVersion\": \"v1.0.0\""))
+                // Check for updates matching CURRENT_VERSION ("v1.3.0")
+                if (response.Contains("\"latestVersion\":") && !response.Contains("\"latestVersion\": \"" + CURRENT_VERSION + "\""))
                 {
-                    // Parse update URL rudimentary for C# 5
-                    string updateUrl = "https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases";
+                    string latestVersionStr = ExtractJsonField(response, "latestVersion");
+                    if (string.IsNullOrEmpty(latestVersionStr)) latestVersionStr = "nueva versión";
+
                     var result = System.Windows.Forms.MessageBox.Show(
-                        "¡Hay una nueva versión de Arkaios DJ Nexus disponible!\n\nComo tu licencia está activa, puedes actualizar gratis. ¿Deseas descargarla ahora?", 
-                        "Nueva Versión Disponible", 
+                        "¡Hay una actualización de Arkaios DJ Nexus disponible (" + latestVersionStr + ")!\n\nTu versión instalada actual es " + CURRENT_VERSION + ".\n\n¿Deseas descargar e instalar automáticamente la nueva versión ahora?", 
+                        "Actualización Disponible", 
                         System.Windows.Forms.MessageBoxButtons.YesNo, 
                         System.Windows.Forms.MessageBoxIcon.Information);
                         
                     if (result == System.Windows.Forms.DialogResult.Yes)
                     {
-                        System.Diagnostics.Process.Start(updateUrl);
+                        AutoDownloadAndInstallUpdate();
                     }
                 }
             }
 
             return true;
+        }
+
+        private static string ExtractJsonField(string json, string fieldName)
+        {
+            try
+            {
+                string searchKey = "\"" + fieldName + "\":";
+                int idx = json.IndexOf(searchKey);
+                if (idx < 0) return "";
+                int start = json.IndexOf("\"", idx + searchKey.Length);
+                if (start < 0) return "";
+                int end = json.IndexOf("\"", start + 1);
+                if (end < 0) return "";
+                return json.Substring(start + 1, end - start - 1);
+            }
+            catch { return ""; }
+        }
+
+        public static void AutoDownloadAndInstallUpdate()
+        {
+            string downloadUrl = "https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases/latest/download/ArkaiosDJ_Nexus_Setup.exe";
+            string tempInstallerPath = Path.Combine(Path.GetTempPath(), "ArkaiosDJ_Nexus_Update_Setup.exe");
+
+            try
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "Iniciando la descarga de la actualización...\n\nEl instalador se abrirá automáticamente al finalizar la descarga.",
+                    "Descargando Actualización",
+                    System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+
+                using (System.Net.WebClient client = new System.Net.WebClient())
+                {
+                    client.DownloadFile(downloadUrl, tempInstallerPath);
+                }
+
+                if (File.Exists(tempInstallerPath))
+                {
+                    OpenUrl(tempInstallerPath);
+                    Environment.Exit(0);
+                }
+            }
+            catch (Exception ex)
+            {
+                var choice = System.Windows.Forms.MessageBox.Show(
+                    "No se pudo descargar automáticamente el instalador (" + ex.Message + ").\n\n¿Deseas abrir la página de descargas de GitHub en tu navegador?",
+                    "Error de Descarga Automática",
+                    System.Windows.Forms.MessageBoxButtons.YesNo,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
+
+                if (choice == System.Windows.Forms.DialogResult.Yes)
+                {
+                    OpenUrl("https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases");
+                }
+            }
+        }
+
+        public static void OpenUrl(string urlOrPath)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = urlOrPath,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show("No se pudo iniciar el proceso: " + ex.Message, "Error", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
+            }
         }
 
         public static bool ValidateKeyLocally(string key)
