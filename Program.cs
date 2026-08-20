@@ -557,14 +557,14 @@ namespace ArkaiosDJAssistant
 
         private void ApplyTabVisibility()
         {
-            if (mainTabs == null || assistantTab == null || allTracksTab == null) return;
+            if (mainTabs == null || assistantTab == null || mediaTab == null) return;
             TabPage selected = mainTabs.SelectedTab;
             mainTabs.TabPages.Clear();
             mainTabs.TabPages.Add(assistantTab);
+            mainTabs.TabPages.Add(mediaTab);
             mainTabs.TabPages.Add(allTracksTab);
             if (AppSettings.ShowAdvancedTabs)
             {
-                mainTabs.TabPages.Add(mediaTab);
                 mainTabs.TabPages.Add(hitsTab);
                 mainTabs.TabPages.Add(hubTab);
                 mainTabs.TabPages.Add(organizerTab);

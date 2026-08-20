@@ -220,64 +220,76 @@ namespace ArkaiosDJAssistant
 
             string suffix = mediaType == "karaoke" ? " karaoke lyrics" : mediaType == "video" ? " official music video" : " official audio";
             string search = "ytsearch" + Math.Max(1, Math.Min(limit, 20)) + ":" + query + suffix;
-            var result = await RunAsync(new[] { "--dump-single-json", "--no-warnings", "--no-playlist", search });
-            if (result.ExitCode != 0 || string.IsNullOrWhiteSpace(result.Output)) return tracks;
 
-            try
+            // Método 1: Búsqueda ultra rápida y estable usando --flat-playlist --print
+            var result = await RunAsync(new[] { "--flat-playlist", "--print", "%(title)s|%(webpage_url)s|%(uploader)s|%(duration_string)s", search });
+            if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.Output))
             {
-                var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(result.Output);
-                object entriesObject;
-                if (root == null || !root.TryGetValue("entries", out entriesObject)) return tracks;
-                var entries = entriesObject as IEnumerable;
-                if (entries == null) return tracks;
-
-                foreach (object entryObject in entries)
+                string[] lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string line in lines)
                 {
-                    var entry = entryObject as Dictionary<string, object>;
-                    if (entry == null) continue;
-                    int duration = ToInt(entry, "duration");
-                    int maxHeight = 0;
-                    int maxAudio = 0;
-                    long audioBytes = 0;
-                    long videoBytes = 0;
-                    object formatsObject;
-                    if (entry.TryGetValue("formats", out formatsObject))
-                    {
-                        var formats = formatsObject as IEnumerable;
-                        if (formats != null) foreach (object formatObject in formats)
-                        {
-                            var format = formatObject as Dictionary<string, object>;
-                            if (format == null) continue;
-                            maxHeight = Math.Max(maxHeight, ToInt(format, "height"));
-                            maxAudio = Math.Max(maxAudio, ToInt(format, "abr"));
-                            long size = ToLong(format, "filesize");
-                            if (size <= 0) size = ToLong(format, "filesize_approx");
-                            string vcodec = ToString(format, "vcodec");
-                            if (size > 0)
-                            {
-                                if (string.Equals(vcodec, "none", StringComparison.OrdinalIgnoreCase))
-                                    audioBytes = Math.Max(audioBytes, size);
-                                else if (!string.Equals(vcodec, "none", StringComparison.OrdinalIgnoreCase))
-                                    videoBytes = Math.Max(videoBytes, size);
-                            }
-                        }
-                    }
+                    if (line.StartsWith("ERROR", StringComparison.OrdinalIgnoreCase)) continue;
+                    string[] parts = line.Split('|');
+                    if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[1])) continue;
 
-                    string url = ToString(entry, "webpage_url");
-                    if (string.IsNullOrEmpty(url)) url = ToString(entry, "url");
-                    if (string.IsNullOrEmpty(url)) continue;
+                    string title = parts[0].Trim();
+                    string url = parts[1].Trim();
+                    string uploader = parts.Length > 2 ? parts[2].Trim() : "";
+                    string duration = parts.Length > 3 ? parts[3].Trim() : "";
+
+                    if (!url.StartsWith("http", StringComparison.OrdinalIgnoreCase)) continue;
+
                     tracks.Add(new YouTubeTrack
                     {
-                        Title = ToString(entry, "title"), Url = url, Uploader = ToString(entry, "uploader"),
-                        Duration = string.Format("{0}:{1:00}", duration / 60, duration % 60),
-                        ViewCount = ToLong(entry, "view_count"), MaxHeight = maxHeight, MaxAudioKbps = maxAudio,
-                        EstimatedAudioBytes = audioBytes,
-                        EstimatedVideoBytes = videoBytes > 0 && audioBytes > 0 ? videoBytes + audioBytes : videoBytes,
-                        AvailableOutputs = mediaType == "music" ? "MP3 / M4A" : "MP4"
+                        Title = title,
+                        Url = url,
+                        Uploader = string.IsNullOrWhiteSpace(uploader) ? "YouTube" : uploader,
+                        Duration = string.IsNullOrWhiteSpace(duration) ? "3:30" : duration,
+                        AvailableOutputs = mediaType == "music" ? "MP3 / M4A" : "MP4",
+                        MaximumQualityOverride = mediaType == "music" ? "audio 320 kbps" : "1080p / 720p"
                     });
                 }
             }
-            catch (Exception ex) { AppendError("Search JSON: " + ex); }
+
+            // Fallback: Si --flat-playlist no retornó resultados, intentar con --dump-single-json
+            if (tracks.Count == 0)
+            {
+                var jsonResult = await RunAsync(new[] { "--dump-single-json", "--no-warnings", "--no-playlist", search });
+                if (jsonResult.ExitCode == 0 && !string.IsNullOrWhiteSpace(jsonResult.Output))
+                {
+                    try
+                    {
+                        var root = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonResult.Output);
+                        object entriesObject;
+                        if (root != null && root.TryGetValue("entries", out entriesObject))
+                        {
+                            var entries = entriesObject as IEnumerable;
+                            if (entries != null)
+                            {
+                                foreach (object entryObject in entries)
+                                {
+                                    var entry = entryObject as Dictionary<string, object>;
+                                    if (entry == null) continue;
+                                    int duration = ToInt(entry, "duration");
+                                    string url = ToString(entry, "webpage_url");
+                                    if (string.IsNullOrEmpty(url)) url = ToString(entry, "url");
+                                    if (string.IsNullOrEmpty(url)) continue;
+                                    tracks.Add(new YouTubeTrack
+                                    {
+                                        Title = ToString(entry, "title"),
+                                        Url = url,
+                                        Uploader = ToString(entry, "uploader"),
+                                        Duration = string.Format("{0}:{1:00}", duration / 60, duration % 60),
+                                        AvailableOutputs = mediaType == "music" ? "MP3 / M4A" : "MP4"
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex) { AppendError("Search JSON: " + ex); }
+                }
+            }
+
             return tracks;
         }
 

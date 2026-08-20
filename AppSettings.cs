@@ -190,7 +190,7 @@ namespace ArkaiosDJAssistant
             VdjDatabaseFile = "";
             VdjExecutableFile = "";
             EnableTransparency = false;
-            ShowAdvancedTabs = false;
+            ShowAdvancedTabs = true;
             PreviewAudioDevice = "Windows default";
             YouTubeCookiesBrowser = "";
             YouTubeCookiesFile = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "youtube-cookies.txt");
