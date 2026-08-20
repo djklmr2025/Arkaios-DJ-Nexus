@@ -23,12 +23,21 @@ namespace ArkaiosDJAssistant
         private const string ATubeMcpUrl = "http://127.0.0.1:3845/";
         private const string LocalGeminiLabUrl = "http://localhost:3000/api/chat";
 
+        // Memoria contextual del hilo conversacional
+        private static string lastSubjectDJ = "Tiësto";
+        private static readonly List<string> historyContext = new List<string>();
+
         public static async Task<AgentResponse> ProcessRequestAsync(string input, Action<string> statusCallback = null)
         {
             if (string.IsNullOrWhiteSpace(input))
                 return new AgentResponse { Text = "Por favor ingresa una pregunta o solicitud de música/video.", Success = false };
 
             string cleanInput = input.Trim();
+            
+            // Guardar contexto en memoria del hilo conversacional
+            historyContext.Add("USER: " + cleanInput);
+            if (historyContext.Count > 10) historyContext.RemoveAt(0);
+
             bool isDownloadRequest = IsDownloadCommand(cleanInput);
 
             if (isDownloadRequest)
@@ -143,6 +152,7 @@ namespace ArkaiosDJAssistant
             string liveAiAnswer = await FetchLiveAiResponseAsync(input);
             if (!string.IsNullOrWhiteSpace(liveAiAnswer))
             {
+                historyContext.Add("AGENT: " + liveAiAnswer);
                 StringBuilder liveReply = new StringBuilder();
                 liveReply.AppendLine("🤖 **AGENTE ARKAIOS:**");
                 liveReply.AppendLine();
@@ -156,86 +166,121 @@ namespace ArkaiosDJAssistant
                 };
             }
 
-            // 2. Motor Conversacional Inteligente Directo (Sin respuestas genéricas repetitivas)
+            // 2. Motor Conversacional Inteligente Contextual (Mantiene el Hilo de la Conversación)
             await Task.Delay(150);
             
             string rawLower = input.ToLowerInvariant();
             string normText = Regex.Replace(rawLower, @"[^a-z0-9\s]", " ");
             normText = Regex.Replace(normText, @"\s+", " ").Trim();
 
+            // Detectar si el usuario nombra a un DJ específico en la consulta actual y actualizar el sujeto activo
+            if (normText.Contains("tiesto") || normText.Contains("tiësto")) lastSubjectDJ = "Tiësto";
+            else if (normText.Contains("armin") || normText.Contains("buuren")) lastSubjectDJ = "Armin van Buuren";
+            else if (normText.Contains("guetta")) lastSubjectDJ = "David Guetta";
+            else if (normText.Contains("garrix")) lastSubjectDJ = "Martin Garrix";
+            else if (normText.Contains("skrillex")) lastSubjectDJ = "Skrillex";
+            else if (normText.Contains("harris")) lastSubjectDJ = "Calvin Harris";
+            else if (normText.Contains("hardwell")) lastSubjectDJ = "Hardwell";
+
             StringBuilder reply = new StringBuilder();
             reply.AppendLine("🤖 **AGENTE ARKAIOS:**");
             reply.AppendLine();
 
-            // A) Tiësto Especifico
-            if (normText.Contains("tiesto") || normText.Contains("tiësto"))
+            // Intención 1: Cobro / Facturación / Ganancias / Presentación / Cuánto cobra
+            bool isFeeQuery = normText.Contains("cobra") || normText.Contains("factura") || normText.Contains("ganancia") ||
+                              normText.Contains("presentacion") || normText.Contains("show") || normText.Contains("cuanto") ||
+                              normText.Contains("tarifa") || normText.Contains("precio") || normText.Contains("costo") || normText.Contains("dinero");
+
+            if (isFeeQuery)
+            {
+                reply.AppendLine("💰 **Facturación y Tarifas por Presentación (" + lastSubjectDJ + "):**");
+                reply.AppendLine();
+
+                if (lastSubjectDJ == "Tiësto")
+                {
+                    reply.AppendLine("• **Tarifa por Show / Set:** **Tiësto** es históricamente uno de los DJs más cotizados de la industria. Cobra entre **$250,000 USD y $500,000 USD por presentación** estándar de 90 a 120 minutos.");
+                    reply.AppendLine("• **Festivales Masivos y Residencias:** En festivales estelares (Tomorrowland, Ultra Music Festival, EDC Las Vegas) o fechas exclusivas en clubes de alto nivel en Las Vegas (Zouk / LIV), su cobro puede ascender hasta **$1,000,000 USD por fecha**.");
+                    reply.AppendLine("• **Patrimonio Neto Estimado:** Su fortuna acumulada ronda los **$170 Millones de USD**, situándolo en el Top 3 de los DJs más acaudalados del planeta junto a Calvin Harris y David Guetta.");
+                }
+                else if (lastSubjectDJ == "David Guetta" || lastSubjectDJ == "Calvin Harris")
+                {
+                    reply.AppendLine("• **Tarifa por Show:** " + lastSubjectDJ + " cobra entre **$300,000 USD y $450,000 USD** por set en festivales internacionales y residencias exclusivas.");
+                    reply.AppendLine("• **Facturación Anual:** Generan entre **$25 y $40 Millones de USD al año** entre shows en vivo, derechos de producción y patrocinio de marcas.");
+                }
+                else if (lastSubjectDJ == "Martin Garrix")
+                {
+                    reply.AppendLine("• **Tarifa por Show:** Martin Garrix cobra entre **$200,000 USD y $350,000 USD** por fecha en su gira mundial y festivales estelares.");
+                }
+                else
+                {
+                    reply.AppendLine("• **Rango General de Top DJs:** Los DJs dentro del Top 10 Mundial facturan entre **$150,000 USD y $400,000 USD por presentación** en eventos estelares.");
+                }
+            }
+            // Intención 2: Tiësto Específico (Biografía / Posición / Hits)
+            else if (normText.Contains("tiesto") || normText.Contains("tiësto"))
             {
                 reply.AppendLine("🎧 **Información sobre DJ Tiësto:**");
                 reply.AppendLine();
-                reply.AppendLine("• **Posición Actual:** Tiësto (Tijs Verwest) se mantiene en el **Top 25 Mundial de DJ Mag** (actualmente posición #23 en el ranking 2024) y sigue siendo uno de los DJs estelares con mayor facturación y presencia como headliner en festivales como Tomorrowland, Ultra Music Festival y EDC Las Vegas.");
-                reply.AppendLine("• **Legado Inigualable:** Fue votado **el DJ #1 del Mundo durante 3 años consecutivos** (2002, 2003, 2004) y fue coronado por la revista DJ Mag como *'The Greatest DJ of All Time'*.");
-                reply.AppendLine("• **Hits Legendarios y Actuales:** Es pionero del género Trance (*Adagio for Strings*, *Lethal Industry*, *Traffic*) y referente del EDM / Dance Pop comercial (*The Business*, *10:35*, *Don't Be Shy*).");
-                reply.AppendLine();
-                reply.AppendLine("💡 *Tip:* Si deseas descargar cualquier canción, remix o video de Tiësto, dime *'bájame Tiësto - The Business'* o *'descarga el video de Tiësto Adagio for Strings'* y lo guardaré en Verde Neón.");
+                reply.AppendLine("• **Posición Actual:** Tiësto (Tijs Verwest) se mantiene en el **Top 25 Mundial de DJ Mag** (actualmente posición #23 en el ranking 2024) y sigue siendo uno de los DJs estelares con mayor facturación en festivales como Tomorrowland, Ultra y EDC Las Vegas.");
+                reply.AppendLine("• **Legado Inigualable:** Fue votado **el DJ #1 del Mundo durante 3 años consecutivos** (2002, 2003, 2004) y coronado por DJ Mag como *'The Greatest DJ of All Time'*.");
+                reply.AppendLine("• **Hits Emblemáticos:** Pionero del Trance (*Adagio for Strings*, *Lethal Industry*) y del Dance Pop comercial (*The Business*, *10:35*, *Don't Be Shy*).");
             }
-            // B) Armin van Buuren
+            // Intención 3: Armin van Buuren
             else if (normText.Contains("armin") || normText.Contains("buuren"))
             {
                 reply.AppendLine("🎧 **Información sobre Armin van Buuren:**");
                 reply.AppendLine();
                 reply.AppendLine("• **Posición Actual:** Se ubica actualmente en el puesto **#5 Global** en el DJ Mag Top 100.");
                 reply.AppendLine("• **Récord Histórico:** Es el único DJ en la historia que ha ganado **5 veces el puesto #1 del Mundo** (2007, 2008, 2009, 2010 y 2012).");
-                reply.AppendLine("• **A State of Trance:** Es el creador y locutor del show de radio semanal *A State of Trance (ASOT)* con más de 1100 episodios transmitidos a nivel global.");
+                reply.AppendLine("• **A State of Trance:** Es el creador y locutor del show de radio semanal *A State of Trance (ASOT)* con más de 1100 episodios transmitidos.");
             }
-            // C) Ranking General de DJs / Top #1 / Garrix & Guetta
-            else if (normText.Contains("1") || normText.Contains("top") || normText.Contains("ranking") || 
-                     normText.Contains("lider") || normText.Contains("mejor") || normText.Contains("popular") || 
-                     normText.Contains("guetta") || normText.Contains("garrix") || normText.Contains("mag") || 
-                     (normText.Contains("dj") && (normText.Contains("quien") || normText.Contains("cual") || normText.Contains("donde") || normText.Contains("posicion") || normText.Contains("puesto"))))
+            // Intención 4: Ranking Estricto DJ #1 (Sin confundir "mejores facturados")
+            else if ((normText.Contains("quien") || normText.Contains("cual")) && (normText.Contains("1") || normText.Contains("primero") || normText.Contains("lider")) && normText.Contains("dj"))
             {
                 reply.AppendLine("🏆 **Top DJs Mundiales e Información de la Escena:**");
-                reply.AppendLine("El **DJ número #1 del mundo actualmente** (según el ranking oficial **DJ Mag Top 100 DJs** y la presencia en festivales como Tomorrowland, Ultra Music Festival y EDC) se disputa entre:");
+                reply.AppendLine("El **DJ número #1 del mundo actualmente** (según el ranking oficial **DJ Mag Top 100 DJs** 2024) se disputa entre:");
                 reply.AppendLine();
-                reply.AppendLine("• 🥇 **Martin Garrix & David Guetta:** Martin Garrix ocupa la posición #1 oficial en DJ Mag 2024, mientras David Guetta domina la radio y los charts con su movimiento *Future Rave*.");
+                reply.AppendLine("• 🥇 **Martin Garrix & David Guetta:** Martin Garrix ocupa el puesto #1 oficial en 2024, mientras David Guetta domina las listas globales con el movimiento *Future Rave*.");
                 reply.AppendLine("• ⚡ **Top 5 Global:** Martin Garrix, David Guetta, Dimitri Vegas & Like Mike, Alok y Armin van Buuren.");
-                reply.AppendLine("• 🔥 **Especialistas por Género:** Charlotte de Witte y Amelie Lens (Techno), Fisher y Michael Bibi (Tech House), Tale Of Us y Anyma (Melodic Techno).");
             }
-            // D) BPMs / Tempos
-            else if (normText.Contains("bpm") || normText.Contains("tempo") || normText.Contains("velocidad") || normText.Contains("compas"))
+            // Intención 5: BPMs / Tempos
+            else if (normText.Contains("bpm") || normText.Contains("tempo") || normText.Contains("velocidad"))
             {
                 reply.AppendLine("⏱️ **Guía de Tempos y BPMs para DJs:**");
-                reply.AppendLine("• **Reggaeton / Urbano:** 85 - 98 BPM (mezclas fluidas en doble tiempo).");
-                reply.AppendLine("• **Cumbia / Tropical:** 90 - 105 BPM (mezclas en frases de 8 compases).");
-                reply.AppendLine("• **House / Dance / EDM:** 120 - 128 BPM (zona estándar para mezclas largas).");
-                reply.AppendLine("• **Tech House / Techno:** 124 - 130 BPM (enfoque en ecualización de bajos).");
+                reply.AppendLine("• **Reggaeton / Urbano:** 85 - 98 BPM.");
+                reply.AppendLine("• **House / EDM:** 120 - 128 BPM.");
+                reply.AppendLine("• **Tech House / Techno:** 124 - 130 BPM.");
             }
-            // E) Camelot Wheel / Mezcla Armónica
-            else if (normText.Contains("camelot") || normText.Contains("key") || normText.Contains("tonalidad") || normText.Contains("armon"))
+            // Intención 6: Camelot Wheel
+            else if (normText.Contains("camelot") || normText.Contains("key") || normText.Contains("tonalidad"))
             {
                 reply.AppendLine("🎹 **Reglas de Mezcla Armónica (Camelot Wheel):**");
-                reply.AppendLine("• **Misma Clave (ej: 8A -> 8A):** Mezcla perfecta sin choque de notas.");
-                reply.AppendLine("• **Cambio Modal (ej: 8A -> 8B):** Transición alegre de Menor a Mayor.");
-                reply.AppendLine("• **Quinta Justa (ej: 8A -> 9A / 7A):** Movimiento natural de 1 hora en la rueda.");
+                reply.AppendLine("• **Misma Clave (8A -> 8A):** Mezcla perfecta.");
+                reply.AppendLine("• **Quinta Justa (8A -> 9A / 7A):** Transición armónica fluida de 1 hora en la rueda.");
             }
-            // F) Saludos / Estado
-            else if (normText.Contains("vivo") || normText.Contains("quien eres") || normText.Contains("hola") || normText.Contains("buenas"))
+            // Intención 7: Saludos / Estado
+            else if (normText.Contains("vivo") || normText.Contains("hola") || normText.Contains("quien eres"))
             {
                 reply.AppendLine("¡Hola! 👋 Estoy 100% activo y listo para ayudarte en lo que necesites.");
-                reply.AppendLine("Puedes hacerme preguntas de **cualquier temática** (música, DJs, ciencia, tecnología o consejos), y mi función estrella es ayudarte a **obtener y descargar cualquier canción, video o karaoke** automáticamente.");
+                reply.AppendLine("Mantenemos el hilo sobre **" + lastSubjectDJ + "** o cualquier otra consulta de música, DJs o temática general.");
             }
-            // G) Cualquier otra consulta general
+            // Intención 8: Respuesta contextual continua fluida
             else
             {
-                reply.AppendLine("¡Entendido! Puedo ayudarte con información sobre cualquier artista, concepto musical, técnica o duda general.");
-                reply.AppendLine("Si deseas información sobre una canción o DJ específico, solo dime su nombre o pídeme directamente *'bájame [canción]'* o *'descarga el video de [artista]'* y lo traeré para ti.");
+                reply.AppendLine("Siguiendo nuestra conversación sobre **" + lastSubjectDJ + "** y la escena musical:");
+                reply.AppendLine();
+                reply.AppendLine("Puedo darte detalles sobre canciones representativas, BPMs recomendados para mezclar sus temas o cualquier otra información de la industria.");
             }
 
             reply.AppendLine();
-            reply.AppendLine("📥 *Recordatorio:* Recuerda que mi función principal es la obtención autónoma de canciones, videos o karaokes. ¡Solo pídeme lo que quieras descargar!");
+            reply.AppendLine("📥 *Recordatorio:* Mi función principal es la obtención autónoma de canciones, videos o karaokes. Si deseas descargar algo de " + lastSubjectDJ + ", dime *'bájame " + lastSubjectDJ + "'* o *'descarga el video de " + lastSubjectDJ + "'* y lo guardaré en Verde Neón.");
+
+            string finalAnswer = reply.ToString();
+            historyContext.Add("AGENT: " + finalAnswer);
 
             return new AgentResponse
             {
-                Text = reply.ToString(),
+                Text = finalAnswer,
                 IsDownload = false,
                 Success = true
             };
@@ -245,7 +290,16 @@ namespace ArkaiosDJAssistant
         {
             try
             {
-                var payloadObj = new { prompt = prompt };
+                // Construir el prompt enviando los últimos turnos de conversación para dar contexto completo
+                StringBuilder fullPrompt = new StringBuilder();
+                fullPrompt.AppendLine("Contexto de la conversación previa:");
+                foreach (string turn in historyContext)
+                {
+                    fullPrompt.AppendLine(turn);
+                }
+                fullPrompt.AppendLine("Pregunta actual del usuario: " + prompt);
+
+                var payloadObj = new { prompt = fullPrompt.ToString() };
                 string jsonPayload = JsonSerializer.Serialize(payloadObj);
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
