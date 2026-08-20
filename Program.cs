@@ -251,35 +251,46 @@ namespace ArkaiosDJAssistant
                 columnMenu.Items.Add(item);
             }
             trackList.ContextMenuStrip = columnMenu;
-            downloadedHubTracks.AddRange(DownloadRegistry.ExistingPaths());
+            SyncAllDownloadedTracks();
 
-            // OwnerDraw for colored stars
+            // OwnerDraw para resaltado vistoso de estrellas y descargas recientes
             trackList.OwnerDraw = true;
             trackList.DrawColumnHeader += (s, ev) => ev.DrawDefault = true;
-            trackList.DrawItem += (s, ev) => { /* NO setear DrawDefault=true aqui, o DrawSubItem no se ejecuta */ };
+            trackList.DrawItem += (s, ev) => { };
             trackList.DrawSubItem += (s, ev) => 
             {
+                bool isSelected = ev.Item.Selected;
+                Color backColor = isSelected ? Color.FromArgb(0, 120, 215) : ev.Item.BackColor;
+                Color foreColor = isSelected ? Color.White : ev.Item.ForeColor;
+
+                using (SolidBrush bgBrush = new SolidBrush(backColor))
+                {
+                    ev.Graphics.FillRectangle(bgBrush, ev.Bounds);
+                }
+
                 if (ev.ColumnIndex == 0) // Columna "Rank"
                 {
-                    ev.DrawBackground();
-                    
                     string text = ev.SubItem.Text;
                     if (!string.IsNullOrEmpty(text))
                     {
-                        Color starColor = Color.White;
-                        if (text.Contains("GOLD")) { text = "★★★★★"; starColor = Color.Gold; }
-                        else if (text.Contains("SILVER")) { text = "★★★★"; starColor = Color.Silver; }
-                        else if (text.Contains("BRONZE")) { text = "★★★"; starColor = Color.Chocolate; }
+                        Color starColor = foreColor;
+                        if (!isSelected)
+                        {
+                            if (text.Contains("GOLD")) { text = "★★★★★"; starColor = Color.Gold; }
+                            else if (text.Contains("SILVER")) { text = "★★★★"; starColor = Color.Silver; }
+                            else if (text.Contains("BRONZE")) { text = "★★★"; starColor = Color.Chocolate; }
+                        }
 
                         using (SolidBrush b = new SolidBrush(starColor))
                         {
-                            ev.Graphics.DrawString(text, ev.Item.Font, b, ev.Bounds.X, ev.Bounds.Y + 2);
+                            ev.Graphics.DrawString(text, ev.Item.Font, b, ev.Bounds.X + 2, ev.Bounds.Y + 2);
                         }
                     }
                 }
                 else
                 {
-                    ev.DrawDefault = true;
+                    TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+                    TextRenderer.DrawText(ev.Graphics, ev.SubItem.Text ?? "", ev.Item.Font, ev.Bounds, foreColor, flags);
                 }
             };
 
@@ -1139,8 +1150,60 @@ namespace ArkaiosDJAssistant
             });
         }
 
+        private void SyncAllDownloadedTracks()
+        {
+            var registryPaths = DownloadRegistry.ExistingPaths();
+            foreach (string path in registryPaths)
+            {
+                if (File.Exists(path) && !downloadedHubTracks.Any(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase)))
+                {
+                    downloadedHubTracks.Add(path);
+                }
+            }
+
+            string[] targetFolders = new[]
+            {
+                AppSettings.GetDownloadFolder("music"),
+                AppSettings.GetDownloadFolder("video"),
+                AppSettings.GetDownloadFolder("karaoke"),
+                AppSettings.GetDownloadFolder(""),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Hub_Descargas")
+            };
+
+            var validExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".mp3", ".m4a", ".wav", ".flac", ".aac", ".ogg",
+                ".mp4", ".mkv", ".avi", ".webm", ".mov", ".cdg"
+            };
+
+            foreach (string folder in targetFolders)
+            {
+                if (Directory.Exists(folder))
+                {
+                    try
+                    {
+                        var files = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
+                            .Where(f => validExtensions.Contains(Path.GetExtension(f)))
+                            .OrderByDescending(f => File.GetLastWriteTime(f))
+                            .ToList();
+
+                        foreach (string file in files)
+                        {
+                            DownloadRegistry.Register(file, "", Path.GetFileNameWithoutExtension(file), "Descarga local", Path.GetExtension(file).ToLowerInvariant());
+                            if (!downloadedHubTracks.Any(p => string.Equals(p, file, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                downloadedHubTracks.Add(file);
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+        }
+
         private void AppendHubTracks()
         {
+            SyncAllDownloadedTracks();
             foreach (string path in downloadedHubTracks.Where(File.Exists)) AppendHubTrack(path);
         }
 
@@ -1158,8 +1221,8 @@ namespace ArkaiosDJAssistant
             item.SubItems.Add(Path.GetFileName(filePath));
             item.SubItems.Add(Path.GetExtension(filePath).ToLowerInvariant());
             item.Tag = filePath;
-            item.BackColor = Color.FromArgb(24, 65, 36);
-            item.ForeColor = Color.LightGreen;
+            item.BackColor = Color.FromArgb(16, 68, 38); // Esmeralda vibrante
+            item.ForeColor = Color.FromArgb(80, 255, 140); // Verde Neón Menta brillante
             trackList.Items.Add(item);
             return item;
         }
@@ -1177,8 +1240,8 @@ namespace ArkaiosDJAssistant
             separator.SubItems.Add("Arrastra las pistas de abajo al plato");
             separator.SubItems.Add("");
             separator.Tag = "ARKAIOS_DOWNLOAD_SEPARATOR";
-            separator.BackColor = Color.FromArgb(12, 90, 42);
-            separator.ForeColor = Color.White;
+            separator.BackColor = Color.FromArgb(0, 102, 204); // Azul Eléctrico
+            separator.ForeColor = Color.Yellow; // Texto Amarillo Neón
             trackList.Items.Add(separator);
         }
 
