@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
@@ -361,6 +362,33 @@ namespace ArkaiosDJAssistant
             return tracks;
         }
 
+        public static (bool Available, string Path, string Mode) EnsureATubeCatcherAvailable()
+        {
+            string[] exeCandidates = new[]
+            {
+                @"C:\Program Files\DsNET Corp\aTube Catcher\aTubeCatcher.exe",
+                @"C:\Program Files (x86)\DsNET Corp\aTube Catcher\aTubeCatcher.exe"
+            };
+
+            foreach (string candidate in exeCandidates)
+            {
+                if (File.Exists(candidate)) return (true, candidate, "exe");
+            }
+
+            string[] pythonCandidates = new[]
+            {
+                @"C:\Program Files\DsNET Corp\aTube Catcher\Resource\python-3.13.1-embed-amd64\python.exe",
+                @"C:\Program Files (x86)\DsNET Corp\aTube Catcher\Resource\python-3.13.1-embed-amd64\python.exe"
+            };
+
+            foreach (string candidate in pythonCandidates)
+            {
+                if (File.Exists(candidate)) return (true, candidate, "python");
+            }
+
+            return (false, null, null);
+        }
+
         public static Task<string> DownloadAudioAsync(string url)
         {
             return DownloadAsync(url, "music", "MP3 320 kbps");
@@ -368,34 +396,176 @@ namespace ArkaiosDJAssistant
 
         public static async Task<string> DownloadAsync(string url, string mediaType, string quality)
         {
-            var status = EnsureYtDlpAvailable();
-            if (!status.Available || string.IsNullOrWhiteSpace(url)) return null;
+            if (string.IsNullOrWhiteSpace(url)) return null;
+
+            // Garantizar calidades predeterminadas solicitadas:
+            // Música: MP3 320 kbps siempre
+            // Video: 720p HD (o máxima disponible si no hay 720p)
+            if (string.IsNullOrWhiteSpace(quality))
+            {
+                quality = mediaType == "music" ? "MP3 320 kbps" : "720p estándar";
+            }
+
             string folder = AppSettings.GetDownloadFolder(mediaType);
             Directory.CreateDirectory(folder);
-            string template = Path.Combine(folder, "%(artist,uploader)s - %(title)s [%(id)s].%(ext)s");
-            var args = new List<string> { "--no-playlist", "--windows-filenames", "--print", "after_move:filepath", "-o", template };
 
-            if (mediaType == "music")
+            string downloadedPath = null;
+            var status = EnsureYtDlpAvailable();
+
+            // MOTOR 1: Búsqueda y Descarga Principal mediante yt-dlp.exe
+            if (status.Available)
             {
-                if (quality.StartsWith("M4A", StringComparison.OrdinalIgnoreCase))
-                    args.AddRange(new[] { "-f", "bestaudio[ext=m4a]/bestaudio", "--remux-video", "m4a" });
+                string template = Path.Combine(folder, "%(artist,uploader)s - %(title)s [%(id)s].%(ext)s");
+                var args = new List<string> { "--no-playlist", "--windows-filenames", "--print", "after_move:filepath", "-o", template };
+
+                if (mediaType == "music")
+                {
+                    if (quality.StartsWith("M4A", StringComparison.OrdinalIgnoreCase))
+                        args.AddRange(new[] { "-f", "bestaudio[ext=m4a]/bestaudio", "--remux-video", "m4a" });
+                    else
+                    {
+                        string bitrate = quality.Contains("192") ? "192" : "320";
+                        args.AddRange(new[] { "-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", bitrate + "K" });
+                    }
+                }
                 else
                 {
-                    string bitrate = quality.Contains("192") ? "192" : "320";
-                    args.AddRange(new[] { "-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", bitrate + "K" });
+                    string cap = quality.StartsWith("1080") ? "[height<=1080]" : quality.StartsWith("720") ? "[height<=720]" : "[height<=720]";
+                    args.AddRange(new[] { "-f", "bestvideo" + cap + "+bestaudio/best" + cap + "/best", "--merge-output-format", "mp4" });
+                }
+                args.Add(url);
+
+                var result = await RunAsync(args.ToArray());
+                if (result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.Output))
+                {
+                    string[] lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    for (int i = lines.Length - 1; i >= 0; i--) if (File.Exists(lines[i].Trim())) downloadedPath = lines[i].Trim();
                 }
             }
-            else
-            {
-                string cap = quality.StartsWith("1080") ? "[height<=1080]" : quality.StartsWith("720") ? "[height<=720]" : "";
-                args.AddRange(new[] { "-f", "bestvideo" + cap + "+bestaudio/best" + cap, "--merge-output-format", "mp4" });
-            }
-            args.Add(url);
 
-            var result = await RunAsync(args.ToArray());
-            if (result.ExitCode != 0) return null;
-            string[] lines = result.Output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            for (int i = lines.Length - 1; i >= 0; i--) if (File.Exists(lines[i].Trim())) return lines[i].Trim();
+            if (!string.IsNullOrWhiteSpace(downloadedPath) && File.Exists(downloadedPath))
+            {
+                return downloadedPath;
+            }
+
+            // MOTOR 2 (RESPALDO AUTOMÁTICO SILENCIOSO): aTube Catcher
+            var atube = EnsureATubeCatcherAvailable();
+            if (atube.Available)
+            {
+                AppendError(DateTime.Now + ": Motor 1 no completó la descarga. Ejecutando Motor 2 automático (aTube Catcher)...");
+                downloadedPath = await DownloadViaATubeCatcherAsync(url, mediaType, quality, folder);
+            }
+
+            return downloadedPath;
+        }
+
+        private static async Task<string> DownloadViaATubeCatcherAsync(string url, string mediaType, string quality, string outputFolder)
+        {
+            var atube = EnsureATubeCatcherAvailable();
+            if (!atube.Available) return null;
+
+            Directory.CreateDirectory(outputFolder);
+
+            // Método A: Si existe ejecutable de aTube Catcher, invocarlo de forma automática en segundo plano (-autostart -exit -dir)
+            if (atube.Mode == "exe" && File.Exists(atube.Path))
+            {
+                try
+                {
+                    string profileName = mediaType == "music" ? "MP3_320.apf2" : "MP4YTBE720.apf2";
+                    string profilesDir = Path.Combine(Path.GetDirectoryName(atube.Path), "Profiles");
+                    string profilePath = Path.Combine(profilesDir, profileName);
+
+                    string args = "-url \"" + url + "\" -dir \"" + outputFolder + "\"";
+                    if (File.Exists(profilePath)) args += " -profile \"" + profilePath + "\"";
+                    args += " -autostart -exit";
+
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = atube.Path,
+                        Arguments = args,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+
+                    DateTime startTime = DateTime.Now;
+                    using (var process = Process.Start(psi))
+                    {
+                        await Task.Run(() => process.WaitForExit(45000));
+                    }
+
+                    // Buscar archivo generado recientemente en la carpeta de destino
+                    var directory = new DirectoryInfo(outputFolder);
+                    var newestFile = directory.GetFiles()
+                        .Where(f => f.LastWriteTime >= startTime.AddSeconds(-2))
+                        .OrderByDescending(f => f.LastWriteTime)
+                        .FirstOrDefault();
+
+                    if (newestFile != null) return newestFile.FullName;
+                }
+                catch (Exception ex)
+                {
+                    AppendError("Fallo invocación background aTube Catcher: " + ex.Message);
+                }
+            }
+
+            // Método B: Usar el entorno Python de aTube Catcher en segundo plano con paquetes certifi/curl_cffi/yt_dlp
+            string ytDlpPath = GetYtDlpExecutablePath();
+            if (File.Exists(ytDlpPath))
+            {
+                string atubeDir = @"C:\Program Files\DsNET Corp\aTube Catcher";
+                string certifiPem = Path.Combine(atubeDir, @"Resource\python-3.13.1-embed-amd64\Lib\site-packages\certifi\cacert.pem");
+
+                string template = Path.Combine(outputFolder, "%(artist,uploader)s - %(title)s [%(id)s].%(ext)s");
+                var args = new List<string> { "--no-playlist", "--windows-filenames", "--print", "after_move:filepath", "-o", template };
+
+                if (File.Exists(certifiPem))
+                {
+                    args.Add("--cacert");
+                    args.Add(certifiPem);
+                }
+
+                if (mediaType == "music")
+                {
+                    args.AddRange(new[] { "-f", "bestaudio", "-x", "--audio-format", "mp3", "--audio-quality", "320K" });
+                }
+                else
+                {
+                    args.AddRange(new[] { "-f", "bestvideo[height<=720]+bestaudio/bestvideo+bestaudio/best", "--merge-output-format", "mp4" });
+                }
+                args.Add(url);
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = ytDlpPath,
+                    Arguments = JoinArguments(args.ToArray()),
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                if (File.Exists(certifiPem))
+                {
+                    psi.EnvironmentVariables["SSL_CERT_FILE"] = certifiPem;
+                    psi.EnvironmentVariables["REQUESTS_CA_BUNDLE"] = certifiPem;
+                }
+
+                using (var process = Process.Start(psi))
+                {
+                    string output = await process.StandardOutput.ReadToEndAsync();
+                    string error = await process.StandardError.ReadToEndAsync();
+                    process.WaitForExit();
+                    if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+                    {
+                        string[] lines = output.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        for (int i = lines.Length - 1; i >= 0; i--) if (File.Exists(lines[i].Trim())) return lines[i].Trim();
+                    }
+                }
+            }
+
             return null;
         }
 
