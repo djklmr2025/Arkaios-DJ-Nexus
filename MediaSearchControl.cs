@@ -37,10 +37,9 @@ namespace ArkaiosDJAssistant
             toolbar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 78, Padding = new Padding(8), WrapContents = true };
             queryBox = new TextBox { Width = 270 };
             queryBox.KeyDown += async (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; await SearchAsync(); } };
-            platformBox = new ComboBox { Width = 125, DropDownStyle = ComboBoxStyle.DropDownList };
-            foreach (PlatformProfile platform in platforms) platformBox.Items.Add(platform.Name);
+            platformBox = new ComboBox { Width = 160, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false };
+            platformBox.Items.Add("YouTube (Motor Oficial)");
             platformBox.SelectedIndex = 0;
-            platformBox.SelectedIndexChanged += (s, e) => UpdatePlatformMode();
             typeBox = new ComboBox { Width = 110, DropDownStyle = ComboBoxStyle.DropDownList };
             typeBox.Items.AddRange(new object[] { "Music", "Video", "Karaoke" });
             typeBox.SelectedIndex = 0;
