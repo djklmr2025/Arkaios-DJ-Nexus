@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace ArkaiosDJAssistant
 {
@@ -97,11 +98,90 @@ namespace ArkaiosDJAssistant
 
         public static string GetDownloadFolder(string mediaType)
         {
+            EnsureVirtualDjIntegration();
+            string root = @"C:\ARKAIOS\Biblioteca_DJ";
+
             if (string.Equals(mediaType, "karaoke", StringComparison.OrdinalIgnoreCase))
-                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "KARAOKES");
+            {
+                string path = Path.Combine(root, "Karaokes");
+                if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+                return path;
+            }
             if (string.Equals(mediaType, "video", StringComparison.OrdinalIgnoreCase))
-                return Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
-            return Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+            {
+                string path = Path.Combine(root, "Videos");
+                if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+                return path;
+            }
+
+            string musicPath = Path.Combine(root, "Musica");
+            if (!Directory.Exists(musicPath)) Directory.CreateDirectory(musicPath);
+            return musicPath;
+        }
+
+        public static void EnsureVirtualDjIntegration()
+        {
+            try
+            {
+                string root = @"C:\ARKAIOS\Biblioteca_DJ";
+                string musicDir = Path.Combine(root, "Musica");
+                string videoDir = Path.Combine(root, "Videos");
+                string karaokeDir = Path.Combine(root, "Karaokes");
+
+                if (!Directory.Exists(root)) Directory.CreateDirectory(root);
+                if (!Directory.Exists(musicDir)) Directory.CreateDirectory(musicDir);
+                if (!Directory.Exists(videoDir)) Directory.CreateDirectory(videoDir);
+                if (!Directory.Exists(karaokeDir)) Directory.CreateDirectory(karaokeDir);
+
+                if (!AllowedFolders.Contains(root, StringComparer.OrdinalIgnoreCase)) AllowedFolders.Add(root);
+                if (!AllowedFolders.Contains(musicDir, StringComparer.OrdinalIgnoreCase)) AllowedFolders.Add(musicDir);
+                if (!AllowedFolders.Contains(videoDir, StringComparer.OrdinalIgnoreCase)) AllowedFolders.Add(videoDir);
+                if (!AllowedFolders.Contains(karaokeDir, StringComparer.OrdinalIgnoreCase)) AllowedFolders.Add(karaokeDir);
+
+                string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                
+                List<string> candidateVdjUserDirs = new List<string>
+                {
+                    Path.Combine(documents, "VirtualDJ"),
+                    Path.Combine(userProfile, "Documents", "VirtualDJ"),
+                    Path.Combine(userProfile, "Documentos", "VirtualDJ"),
+                    Path.Combine(userProfile, "OneDrive", "Documents", "VirtualDJ"),
+                    Path.Combine(userProfile, "OneDrive", "Documentos", "VirtualDJ")
+                };
+
+                foreach (string vdjUserDir in candidateVdjUserDirs)
+                {
+                    if (Directory.Exists(vdjUserDir))
+                    {
+                        string vdjFoldersDir = Path.Combine(vdjUserDir, "Folders");
+                        string vdjPlaylistsDir = Path.Combine(vdjUserDir, "Playlists");
+
+                        if (!Directory.Exists(vdjFoldersDir)) Directory.CreateDirectory(vdjFoldersDir);
+                        if (!Directory.Exists(vdjPlaylistsDir)) Directory.CreateDirectory(vdjPlaylistsDir);
+
+                        WriteVdjFolderXml(Path.Combine(vdjFoldersDir, "ARKAIOS_MUSICA.vdjfolder"), "ARKAIOS MUSICA", musicDir, "type = \"audio\" or extension = \"mp3\" or extension = \"wav\" or extension = \"m4a\" or extension = \"flac\"");
+                        WriteVdjFolderXml(Path.Combine(vdjFoldersDir, "ARKAIOS_VIDEOS.vdjfolder"), "ARKAIOS VIDEOS", videoDir, "type = \"video\" or extension = \"mp4\" or extension = \"avi\" or extension = \"vob\" or extension = \"mkv\"");
+                        WriteVdjFolderXml(Path.Combine(vdjFoldersDir, "ARKAIOS_KARAOKES.vdjfolder"), "ARKAIOS KARAOKES", karaokeDir, "type = \"karaoke\" or extension = \"cdg\" or extension = \"kfn\" or extension = \"zip\"");
+                    }
+                }
+            }
+            catch {}
+        }
+
+        private static void WriteVdjFolderXml(string filePath, string folderName, string folderPath, string filterQuery)
+        {
+            try
+            {
+                string xmlContent = string.Format(
+                    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n" +
+                    "<VirtualFolder name=\"{0}\">\r\n" +
+                    "  <Filter>folder \"{1}\" or ({2})</Filter>\r\n" +
+                    "</VirtualFolder>", folderName, folderPath, filterQuery);
+
+                File.WriteAllText(filePath, xmlContent, Encoding.UTF8);
+            }
+            catch {}
         }
 
         static AppSettings()

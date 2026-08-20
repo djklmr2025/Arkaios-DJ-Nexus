@@ -1267,6 +1267,7 @@ namespace ArkaiosDJAssistant
             }
 
             AppSettings.Load();
+            AppSettings.EnsureVirtualDjIntegration();
             
             if (AppSettings.IsConfigured())
             {
