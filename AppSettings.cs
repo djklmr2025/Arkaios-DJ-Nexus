@@ -165,6 +165,21 @@ namespace ArkaiosDJAssistant
                         WriteVdjFolderXml(Path.Combine(vdjFoldersDir, "ARKAIOS_KARAOKES.vdjfolder"), "ARKAIOS KARAOKES", karaokeDir, "type = \"karaoke\" or extension = \"cdg\" or extension = \"kfn\" or extension = \"zip\"");
                     }
                 }
+
+                EnsureATubeCatcherIntegration();
+            }
+            catch {}
+        }
+
+        public static void EnsureATubeCatcherIntegration()
+        {
+            try
+            {
+                string targetDir = @"C:\ARKAIOS\Biblioteca_DJ\Musica";
+                if (!Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
+
+                Microsoft.Win32.Registry.SetValue(@"HKEY_CURRENT_USER\Software\DsNET Corp\aTube Catcher", "SaveDirectory", targetDir);
+                Microsoft.Win32.Registry.SetValue(@"HKEY_CURRENT_USER\Software\aTube Catcher", "SaveDirectory", targetDir);
             }
             catch {}
         }
