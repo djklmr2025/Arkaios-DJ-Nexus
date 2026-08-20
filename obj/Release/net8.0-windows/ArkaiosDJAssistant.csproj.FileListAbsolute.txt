@@ -2,7 +2,6 @@ C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ArkaiosDJAssistant.GeneratedM
 C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ArkaiosDJAssistant.csproj.CoreCompileInputs.cache
 C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ArkaiosDJAssistant.sourcelink.json
 C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ArkaiosDJAssistant.csproj.AssemblyReference.cache
-C:\ARKAIOS\DJ_Assistant\bin\Release\yt-dlp.exe
 C:\ARKAIOS\DJ_Assistant\bin\Release\ArkaiosDJ.exe
 C:\ARKAIOS\DJ_Assistant\bin\Release\config.txt
 C:\ARKAIOS\DJ_Assistant\bin\Release\ArkaiosDJ.deps.json
@@ -20,3 +19,4 @@ C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\refint\ArkaiosDJ.dll
 C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ArkaiosDJ.pdb
 C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ArkaiosDJAssistant.genruntimeconfig.cache
 C:\ARKAIOS\DJ_Assistant\obj\Release\net8.0-windows\ref\ArkaiosDJ.dll
+C:\ARKAIOS\DJ_Assistant\bin\Release\yt-dlp.exe

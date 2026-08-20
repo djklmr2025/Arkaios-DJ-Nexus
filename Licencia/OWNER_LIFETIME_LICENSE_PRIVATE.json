@@ -1,0 +1,30 @@
+﻿{
+  "key": "QVJLQUlPUy1MSUZFVElNRS1VTklWRVJTQUx8TElGRVRJTUV8REogS0xNUiAvIEFya2Fpb3MgT3duZXJ8T1dORVJ8MjAyNi0wNy0yMVQwMTo1OTo0OC4zMzVafGQ2YTE2MGY1YmY3MzUxYjYxOThmZmVhNmVkMjI5ZjZlZjI0MzJiOWFkODc4ODdlNTM1OTg1Y2U4YWU4Mjk4YWQ=",
+  "localValid": true,
+  "license": {
+    "hwid": "ARKAIOS-LIFETIME-UNIVERSAL",
+    "type": "LIFETIME",
+    "name": "DJ KLMR / Arkaios Owner",
+    "phone": "OWNER",
+    "timestamp": "2026-07-21T01:59:48.335Z",
+    "signature": "d6a160f5bf7351b6198ffea6ed229f6ef2432b9ad87887e535985ce8ae8298ad",
+    "decoded": "ARKAIOS-LIFETIME-UNIVERSAL|LIFETIME|DJ KLMR / Arkaios Owner|OWNER|2026-07-21T01:59:48.335Z|d6a160f5bf7351b6198ffea6ed229f6ef2432b9ad87887e535985ce8ae8298ad"
+  },
+  "registration": {
+    "success": true,
+    "message": "License registered."
+  },
+  "serverValidation": {
+    "ok": true,
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Valid license.",
+      "latestVersion": "v1.2.0",
+      "updateUrl": "https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases/tag/v1.2.0",
+      "installerUrl": "https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases/download/v1.2.0/ArkaiosDJ_Nexus_Setup.exe",
+      "packageUrl": "https://github.com/djklmr2025/Arkaios-DJ-Nexus/releases/download/v1.2.0/ArkaiosDJ_Nexus_Final_Release_v1.2.0_build2.zip",
+      "sha256": "9D9C13CB8BF252C790017E219649C3437ABBD17F65AA6DF36F9360227742A3FE"
+    }
+  }
+}
