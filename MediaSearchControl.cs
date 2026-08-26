@@ -51,7 +51,33 @@ namespace ArkaiosDJAssistant
             folderButton.Click += (s, e) => OpenDestination();
             adjustButton = new Button { Text = "Ajustar con Arkaios World", AutoSize = true };
             adjustButton.Click += async (s, e) => await AdjustQueryAsync();
-            toolbar.Controls.AddRange(new Control[] { queryBox, platformBox, typeBox, qualityBox, searchButton, folderButton, adjustButton });
+
+            var universalBox = new TextBox { Width = 320, Text = "" };
+            var universalBtn = new Button { Text = "⚡ Descargar Enlace Universal", AutoSize = true, BackColor = Color.FromArgb(0, 160, 120), ForeColor = Color.White };
+            universalBtn.Click += async (s, e) =>
+            {
+                string url = universalBox.Text.Trim();
+                if (string.IsNullOrWhiteSpace(url)) return;
+                SetBusy(true, "Analizando enlace universal en segundo plano...", universalBtn, "Descargando...");
+                try
+                {
+                    var res = await UniversalDownloaderEngine.DownloadFromUrlAsync(url, null, msg => statusLabel.Text = msg);
+                    if (res.Success)
+                    {
+                        statusLabel.Text = "✅ Descarga exitosa (" + res.PlatformName + "): " + res.Message;
+                        MessageBox.Show("¡Archivo procesado y descargado exitosamente en tu carpeta de música!\n\nPlataforma: " + res.PlatformName + "\nMensaje: " + res.Message, "Multi-Descargador Universal", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        universalBox.Clear();
+                    }
+                    else
+                    {
+                        statusLabel.Text = "⚠️ " + res.Message;
+                        MessageBox.Show("No se pudo descargar el enlace directamente.\n\nPuedes probar copiando el enlace exacto o verificando la URL.\nMensaje: " + res.Message, "Multi-Descargador Universal", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+                finally { SetBusy(false, null, universalBtn, "⚡ Descargar Enlace Universal"); }
+            };
+
+            toolbar.Controls.AddRange(new Control[] { queryBox, platformBox, typeBox, qualityBox, searchButton, folderButton, adjustButton, universalBox, universalBtn });
 
             resultsGrid = new DataGridView
             {
@@ -59,21 +85,33 @@ namespace ArkaiosDJAssistant
                 AutoGenerateColumns = false, AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells,
                 BackgroundColor = Color.FromArgb(30, 30, 30), ForeColor = Color.Black, SelectionMode = DataGridViewSelectionMode.FullRowSelect
             };
-            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Título / metadatos", DataPropertyName = "Title", Width = 360 });
-            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Canal", DataPropertyName = "Uploader", Width = 150 });
-            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Duración", DataPropertyName = "Duration", Width = 75 });
-            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Máximo real", DataPropertyName = "MaximumQuality", Width = 120 });
-            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Salida", DataPropertyName = "AvailableOutputs", Width = 90 });
-            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Estado", DataPropertyName = "DownloadState", Width = 105 });
-            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "Vista previa", DataPropertyName = "PreviewAction", UseColumnTextForButtonValue = false, Width = 105 });
-            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "↓ Hub", DataPropertyName = "HubAction", UseColumnTextForButtonValue = false, Width = 155 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Título / metadatos", DataPropertyName = "Title", Width = 280 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Canal", DataPropertyName = "Uploader", Width = 140 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Duración", DataPropertyName = "Duration", Width = 70 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Máximo real", DataPropertyName = "MaximumQuality", Width = 100 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Salida", DataPropertyName = "AvailableOutputs", Width = 80 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Estado", DataPropertyName = "DownloadState", Width = 95 });
+            resultsGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Enlace Exacto", DataPropertyName = "Url", Width = 200 });
+            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "📋 Copiar Link", DataPropertyName = "CopyAction", UseColumnTextForButtonValue = false, Width = 110 });
+            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "Vista previa", DataPropertyName = "PreviewAction", UseColumnTextForButtonValue = false, Width = 100 });
+            resultsGrid.Columns.Add(new DataGridViewButtonColumn { HeaderText = "↓ Hub", DataPropertyName = "HubAction", UseColumnTextForButtonValue = false, Width = 140 });
             foreach (DataGridViewColumn column in resultsGrid.Columns) column.SortMode = DataGridViewColumnSortMode.Programmatic;
             resultsGrid.ColumnHeaderMouseClick += (s, e) => SortByColumn(resultsGrid.Columns[e.ColumnIndex].DataPropertyName);
             resultsGrid.CellContentClick += async (s, e) =>
             {
                 if (e.RowIndex < 0) return;
-                if (e.ColumnIndex == 6) Preview(e.RowIndex);
-                else if (e.ColumnIndex == 7) await DownloadAsync(e.RowIndex);
+                if (e.ColumnIndex == 7)
+                {
+                    string url = results[e.RowIndex].Url;
+                    if (!string.IsNullOrWhiteSpace(url))
+                    {
+                        Clipboard.SetText(url);
+                        statusLabel.Text = "📋 Enlace copiado al portapapeles: " + url;
+                        MessageBox.Show("Enlace exacto copiado al portapapeles:\n" + url, "Enlace Copiado", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                else if (e.ColumnIndex == 8) Preview(e.RowIndex);
+                else if (e.ColumnIndex == 9) await DownloadAsync(e.RowIndex);
             };
             resultsGrid.CellFormatting += ResultsGrid_CellFormatting;
 

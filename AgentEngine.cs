@@ -76,6 +76,25 @@ namespace ArkaiosDJAssistant
             else if (lower.Contains("karaoke") || lower.Contains("cdg") || lower.Contains("pista"))
                 mediaType = "karaoke";
 
+            // If input is a URL link directly
+            if (input.Contains("http://") || input.Contains("https://") || input.Contains("www."))
+            {
+                statusCallback?.Invoke("🌐 Agente ARKAIOS: Detectado enlace de plataforma web. Iniciando descarga autónoma...");
+                var uniRes = await UniversalDownloaderEngine.DownloadFromUrlAsync(input, null, statusCallback);
+                if (uniRes.Success && !string.IsNullOrEmpty(uniRes.FilePath) && File.Exists(uniRes.FilePath))
+                {
+                    DownloadRegistry.Register(uniRes.FilePath, input, uniRes.Title, uniRes.PlatformName, mediaType);
+                    string fn = Path.GetFileName(uniRes.FilePath);
+                    StringBuilder text = new StringBuilder();
+                    text.AppendLine("✅ **¡Descarga de enlace completada con éxito por el Agente!**");
+                    text.AppendLine("🌐 **Plataforma Origen:** " + uniRes.PlatformName);
+                    text.AppendLine("📌 **Archivo:** " + fn);
+                    text.AppendLine("📁 **Ubicación:** " + uniRes.FilePath);
+                    text.AppendLine("⚡ **Estado:** Archivo guardado y registrado en el Hub Local en Verde Neón.");
+                    return new AgentResponse { Text = text.ToString(), IsDownload = true, DownloadedPath = uniRes.FilePath, Success = true };
+                }
+            }
+
             string searchQuery = CleanSearchQuery(input);
             if (string.IsNullOrWhiteSpace(searchQuery)) searchQuery = input;
 

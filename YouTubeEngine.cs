@@ -26,6 +26,7 @@ namespace ArkaiosDJAssistant
         public string DownloadedPath { get; set; }
         public string PreviewAction { get { return Downloaded ? "Prescuchar" : "Previsualizar"; } }
         public string HubAction { get { return Downloaded ? "Ver en AutoHelp + Camelot" : "↓ Descargar"; } }
+        public string CopyAction { get { return "📋 Copiar Link"; } }
         public string DownloadState { get { return Downloaded ? "YA DESCARGADA" : "En linea"; } }
         public string MaximumQualityOverride { get; set; }
         public string MaximumQuality
