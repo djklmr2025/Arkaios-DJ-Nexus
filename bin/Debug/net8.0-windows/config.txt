@@ -1,0 +1,9 @@
+C:\Users\djklm\Documentos\VirtualDJ\History
+C:\Users\djklm\Documentos\VirtualDJ\database.xml
+0
+C:\Program Files\Atomix\Virtual DJ\virtualdj.exe
+C:\DJKLMR\Music
+C:\DJKLMR\Videos
+C:\DJKLMR\Videos para ediciones
+youtube_cookies_browser=none
+youtube_cookies_file=C:\ARKAIOS\DJ_Assistant\youtube-cookies.txt

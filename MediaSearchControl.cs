@@ -366,10 +366,11 @@ namespace ArkaiosDJAssistant
             return new List<PlatformProfile>
             {
                 new PlatformProfile("YouTube", "yt-dlp real", "Descarga audio/video compatible", "MP3/M4A/MP4", "https://www.youtube.com/results?search_query={0}", true),
-                new PlatformProfile("Spotify", "Web API / login", "Catalogo, playlists y playback autorizado", "Metadata/enlace", "https://open.spotify.com/search/{0}", false),
+                new PlatformProfile("Spotify", "Extractor Nivel 2 + SpotiDownloader", "Descarga directa de tracks/playlists de Spotify", "MP3 320kbps", "https://open.spotify.com/search/{0}", true),
+                new PlatformProfile("SpotiDownloader.com", "Herramienta Web Externa", "Descarga manual via navegador Web", "MP3/ZIP", "https://spotidownloader.com/en19", false),
                 new PlatformProfile("Apple Music", "MusicKit / Apple Music API", "Catalogo, charts, biblioteca y previews autorizados", "Metadata/enlace", "https://music.apple.com/us/search?term={0}", false),
                 new PlatformProfile("SoundCloud", "API/enlace oficial", "Catalogo publico y preview segun disponibilidad", "Metadata/enlace", "https://soundcloud.com/search?q={0}", false),
-                new PlatformProfile("Bandcamp", "Busqueda publica", "Catalogo publico del artista/album", "Metadata/enlace", "https://bandcamp.com/search?q={0}", false),
+                new PlatformProfile("Bandcamp", "Busqueda publica", "Catalogo publico del artista/artista", "Metadata/enlace", "https://bandcamp.com/search?q={0}", false),
                 new PlatformProfile("Deezer", "API publica/OAuth", "Catalogo, preview corto y metadata", "Metadata/preview", "https://www.deezer.com/search/{0}", false),
                 new PlatformProfile("TIDAL", "API/login", "Catalogo y playback autorizado", "Metadata/enlace", "https://listen.tidal.com/search?q={0}", false),
                 new PlatformProfile("Amazon Music", "Enlace oficial", "Busqueda y playback en app/web oficial", "Metadata/enlace", "https://music.amazon.com/search/{0}", false),

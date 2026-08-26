@@ -40,6 +40,11 @@ namespace ArkaiosDJAssistant
 
         public static async Task<PlaylistExtractResult> ExtractAsync(string playlistUrl)
         {
+            if (!string.IsNullOrWhiteSpace(playlistUrl) && playlistUrl.IndexOf("spotify.com", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return await ExtractSpotifyAsync(playlistUrl);
+            }
+
             string normalizedUrl = NormalizeYouTubeUrl(playlistUrl);
             PlaylistExtractResult remote = await ExtractRemoteAsync(normalizedUrl);
             if (remote.Success && remote.Items.Count > 0) return remote;
@@ -53,6 +58,92 @@ namespace ArkaiosDJAssistant
                 Source = "Render/local",
                 Error = BuildCombinedError(remote, local)
             };
+        }
+
+        public static async Task<PlaylistExtractResult> ExtractSpotifyAsync(string spotifyUrl)
+        {
+            return await Task.Run(() =>
+            {
+                var result = new PlaylistExtractResult { Source = "Spotify Extractor" };
+                try
+                {
+                    ForceModernTls();
+                    string cleanUrl = spotifyUrl.Trim();
+
+                    if (cleanUrl.IndexOf("/track/", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        using (var client = new WebClient { Encoding = Encoding.UTF8 })
+                        {
+                            client.Headers[HttpRequestHeader.UserAgent] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                            string oembedUrl = "https://open.spotify.com/oembed?url=" + Uri.EscapeDataString(cleanUrl);
+                            string json = client.DownloadString(oembedUrl);
+                            var dict = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+                            string title = ToString(dict, "title");
+                            if (!string.IsNullOrWhiteSpace(title))
+                            {
+                                result.Items.Add(new PlaylistExtractItem
+                                {
+                                    Title = title,
+                                    Uploader = "Spotify",
+                                    Url = "ytsearch:" + title,
+                                    Duration = "3:30",
+                                    Category = "spotify_track"
+                                });
+                                result.Success = true;
+                                return result;
+                            }
+                        }
+                    }
+                    else if (cleanUrl.IndexOf("/playlist/", StringComparison.OrdinalIgnoreCase) >= 0 || cleanUrl.IndexOf("/album/", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        string embedUrl = cleanUrl.Replace("open.spotify.com/", "open.spotify.com/embed/");
+                        using (var client = new WebClient { Encoding = Encoding.UTF8 })
+                        {
+                            client.Headers[HttpRequestHeader.UserAgent] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)";
+                            string html = client.DownloadString(embedUrl);
+                            Match match = Regex.Match(html, @"__NEXT_DATA__.*?>(.*?)</script>", RegexOptions.Singleline);
+                            if (match.Success)
+                            {
+                                string json = match.Groups[1].Value;
+                                var jsonObj = Newtonsoft.Json.Linq.JObject.Parse(json);
+                                var trackList = jsonObj["props"]?["pageProps"]?["state"]?["data"]?["entity"]?["trackList"];
+                                if (trackList != null)
+                                {
+                                    foreach (var t in trackList)
+                                    {
+                                        string title = t["title"]?.ToString();
+                                        string subtitle = t["subtitle"]?.ToString();
+                                        if (!string.IsNullOrWhiteSpace(title))
+                                        {
+                                            string query = string.IsNullOrWhiteSpace(subtitle) ? title : subtitle + " - " + title;
+                                            result.Items.Add(new PlaylistExtractItem
+                                            {
+                                                Title = title,
+                                                Uploader = subtitle ?? "Spotify",
+                                                Url = "ytsearch:" + query,
+                                                Duration = "3:30",
+                                                Category = "spotify_playlist"
+                                            });
+                                        }
+                                    }
+                                    result.Success = result.Items.Count > 0;
+                                    if (result.Success) return result;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    result.Error = "Error al extraer de Spotify: " + ex.Message;
+                }
+
+                if (result.Items.Count == 0 && string.IsNullOrWhiteSpace(result.Error))
+                {
+                    result.Error = "No se pudieron obtener pistas del enlace de Spotify.";
+                }
+                return result;
+            });
         }
 
         private static async Task<PlaylistExtractResult> ExtractRemoteAsync(string playlistUrl)
