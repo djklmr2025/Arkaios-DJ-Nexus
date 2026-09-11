@@ -67,10 +67,8 @@ namespace ArkaiosDJAssistant
         {
             try
             {
-                string settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VirtualDJ", "settings.xml");
-                if (!File.Exists(settings))
-                    settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documentos", "VirtualDJ", "settings.xml");
-                if (!File.Exists(settings)) return "";
+                string settings = AppSettings.GetVirtualDjSettingsXmlPath();
+                if (string.IsNullOrWhiteSpace(settings) || !File.Exists(settings)) return "";
 
                 string xml = File.ReadAllText(settings, Encoding.UTF8);
                 Match match = Regex.Match(xml, "source=\"headphones\"[^>]*soundcard=\"([^\"]+)\"|soundcard=\"([^\"]+)\"[^>]*source=\"headphones\"", RegexOptions.IgnoreCase);

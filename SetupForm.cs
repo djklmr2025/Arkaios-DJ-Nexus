@@ -99,14 +99,9 @@ namespace ArkaiosDJAssistant
 
         private void AutoDetectPaths()
         {
-            string docsPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documentos");
-            if (!Directory.Exists(docsPath)) docsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            string vdjFolder = Path.Combine(docsPath, "VirtualDJ");
-            
-            if (Directory.Exists(Path.Combine(vdjFolder, "History")))
-                txtHistory.Text = Path.Combine(vdjFolder, "History");
-            if (File.Exists(Path.Combine(vdjFolder, "database.xml")))
-                txtDatabase.Text = Path.Combine(vdjFolder, "database.xml");
+            AppSettings.AutoDetectVirtualDjPaths(force: true);
+            txtHistory.Text = AppSettings.VdjHistoryFolder ?? "";
+            txtDatabase.Text = AppSettings.VdjDatabaseFile ?? "";
         }
 
         private void BtnHistBrowse_Click(object sender, EventArgs e)

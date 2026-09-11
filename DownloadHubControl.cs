@@ -460,13 +460,8 @@ namespace ArkaiosDJAssistant
         {
             try
             {
-                string settings = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VirtualDJ", "settings.xml");
-                if (!File.Exists(settings))
-                {
-                    string spanishDocs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documentos", "VirtualDJ", "settings.xml");
-                    settings = spanishDocs;
-                }
-                if (!File.Exists(settings)) return "";
+                string settings = AppSettings.GetVirtualDjSettingsXmlPath();
+                if (string.IsNullOrWhiteSpace(settings) || !File.Exists(settings)) return "";
 
                 string xml = File.ReadAllText(settings, Encoding.UTF8);
                 Match match = Regex.Match(xml, "source=\"headphones\"[^>]*soundcard=\"([^\"]+)\"|soundcard=\"([^\"]+)\"[^>]*source=\"headphones\"", RegexOptions.IgnoreCase);
@@ -489,9 +484,7 @@ namespace ArkaiosDJAssistant
 
             try
             {
-                string playlistFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documentos", "VirtualDJ", "Playlists");
-                if (!Directory.Exists(playlistFolder))
-                    playlistFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VirtualDJ", "Playlists");
+                string playlistFolder = AppSettings.GetVirtualDjPlaylistsFolder();
                 Directory.CreateDirectory(playlistFolder);
 
                 string playlistPath = Path.Combine(playlistFolder, "ARKAIOS Hub " + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".m3u");

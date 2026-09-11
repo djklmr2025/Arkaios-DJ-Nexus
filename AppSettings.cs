@@ -21,29 +21,61 @@ namespace ArkaiosDJAssistant
         public static string YtDlpCustomPath { get; set; }
         public static List<string> AllowedFolders { get; set; }
 
-        public static void AutoDetectVirtualDjPaths()
+        public static void AutoDetectVirtualDjPaths(bool force = false)
         {
-            if (!string.IsNullOrWhiteSpace(VdjDatabaseFile) && File.Exists(VdjDatabaseFile))
+            if (!force && !string.IsNullOrWhiteSpace(VdjDatabaseFile) && File.Exists(VdjDatabaseFile) &&
+                !string.IsNullOrWhiteSpace(VdjHistoryFolder) && Directory.Exists(VdjHistoryFolder))
+            {
                 return;
+            }
 
+            string bestExistingBase = null;
             foreach (string baseFolder in GetVirtualDjBaseCandidates())
             {
-                string database = Path.Combine(baseFolder, "database.xml");
-                string history = Path.Combine(baseFolder, "History");
-                if (File.Exists(database))
+                if (Directory.Exists(baseFolder))
                 {
-                    VdjDatabaseFile = database;
-                    VdjHistoryFolder = Directory.Exists(history) ? history : baseFolder;
-                    return;
+                    string database = Path.Combine(baseFolder, "database.xml");
+                    string history = Path.Combine(baseFolder, "History");
+                    if (File.Exists(database))
+                    {
+                        VdjDatabaseFile = database;
+                        VdjHistoryFolder = Directory.Exists(history) ? history : baseFolder;
+                        return;
+                    }
+                    if (Directory.Exists(history))
+                    {
+                        VdjHistoryFolder = history;
+                        VdjDatabaseFile = database;
+                        return;
+                    }
+                    if (bestExistingBase == null)
+                        bestExistingBase = baseFolder;
                 }
             }
+
+            if (bestExistingBase != null)
+            {
+                VdjDatabaseFile = Path.Combine(bestExistingBase, "database.xml");
+                VdjHistoryFolder = Path.Combine(bestExistingBase, "History");
+                return;
+            }
+
+            string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (string.IsNullOrWhiteSpace(docs) || !Directory.Exists(docs))
+                docs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents");
+
+            string defaultVdj = Path.Combine(docs, "VirtualDJ");
+            VdjDatabaseFile = Path.Combine(defaultVdj, "database.xml");
+            VdjHistoryFolder = Path.Combine(defaultVdj, "History");
         }
 
-        private static IEnumerable<string> GetVirtualDjBaseCandidates()
+        public static IEnumerable<string> GetVirtualDjBaseCandidates()
         {
             var candidates = new List<string>();
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
             if (!string.IsNullOrWhiteSpace(documents))
             {
@@ -57,9 +89,56 @@ namespace ArkaiosDJAssistant
                 candidates.Add(Path.Combine(profile, "Documentos", "VirtualDJ"));
                 candidates.Add(Path.Combine(profile, "OneDrive", "Documents", "VirtualDJ"));
                 candidates.Add(Path.Combine(profile, "OneDrive", "Documentos", "VirtualDJ"));
+                candidates.Add(Path.Combine(profile, "VirtualDJ"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(localAppData))
+            {
+                candidates.Add(Path.Combine(localAppData, "VirtualDJ"));
+            }
+
+            if (!string.IsNullOrWhiteSpace(appData))
+            {
+                candidates.Add(Path.Combine(appData, "VirtualDJ"));
             }
 
             return candidates.Where(path => !string.IsNullOrWhiteSpace(path)).Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        public static string GetVirtualDjPlaylistsFolder()
+        {
+            if (!string.IsNullOrWhiteSpace(VdjDatabaseFile))
+            {
+                string dir = Path.GetDirectoryName(VdjDatabaseFile);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    return Path.Combine(dir, "Playlists");
+            }
+            foreach (string baseDir in GetVirtualDjBaseCandidates())
+            {
+                string playlists = Path.Combine(baseDir, "Playlists");
+                if (Directory.Exists(playlists)) return playlists;
+            }
+            string defaultDocs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            return Path.Combine(defaultDocs, "VirtualDJ", "Playlists");
+        }
+
+        public static string GetVirtualDjSettingsXmlPath()
+        {
+            if (!string.IsNullOrWhiteSpace(VdjDatabaseFile))
+            {
+                string dir = Path.GetDirectoryName(VdjDatabaseFile);
+                if (!string.IsNullOrWhiteSpace(dir))
+                {
+                    string s = Path.Combine(dir, "settings.xml");
+                    if (File.Exists(s)) return s;
+                }
+            }
+            foreach (string baseDir in GetVirtualDjBaseCandidates())
+            {
+                string s = Path.Combine(baseDir, "settings.xml");
+                if (File.Exists(s)) return s;
+            }
+            return "";
         }
 
         public static string MediaLibraryRoot
@@ -220,8 +299,8 @@ namespace ArkaiosDJAssistant
                 var lines = File.ReadAllLines(settingsFile);
                 if (lines.Length >= 2)
                 {
-                    VdjHistoryFolder = lines[0];
-                    VdjDatabaseFile = lines[1];
+                    VdjHistoryFolder = Environment.ExpandEnvironmentVariables(lines[0] ?? "").Trim();
+                    VdjDatabaseFile = Environment.ExpandEnvironmentVariables(lines[1] ?? "").Trim();
                 }
                 if (lines.Length >= 3)
                 {
@@ -229,7 +308,7 @@ namespace ArkaiosDJAssistant
                 }
                 if (lines.Length >= 4)
                 {
-                    VdjExecutableFile = lines[3];
+                    VdjExecutableFile = Environment.ExpandEnvironmentVariables(lines[3] ?? "").Trim();
                 }
                 if (lines.Length >= 5)
                 {
@@ -242,11 +321,11 @@ namespace ArkaiosDJAssistant
                         }
                         else if (line.StartsWith("youtube_cookies_file=", StringComparison.OrdinalIgnoreCase))
                         {
-                            YouTubeCookiesFile = line.Substring("youtube_cookies_file=".Length).Trim();
+                            YouTubeCookiesFile = Environment.ExpandEnvironmentVariables(line.Substring("youtube_cookies_file=".Length).Trim());
                         }
                         else if (line.StartsWith("ytdlp_path=", StringComparison.OrdinalIgnoreCase))
                         {
-                            YtDlpCustomPath = line.Substring("ytdlp_path=".Length).Trim();
+                            YtDlpCustomPath = Environment.ExpandEnvironmentVariables(line.Substring("ytdlp_path=".Length).Trim());
                         }
                         else if (line.StartsWith("show_advanced_tabs=", StringComparison.OrdinalIgnoreCase))
                         {
@@ -257,12 +336,22 @@ namespace ArkaiosDJAssistant
                             PreviewAudioDevice = line.Substring("preview_audio_device=".Length).Trim();
                         }
                         else if (!string.IsNullOrWhiteSpace(line))
-                            AllowedFolders.Add(line);
+                        {
+                            string expandedFolder = Environment.ExpandEnvironmentVariables(line).Trim();
+                            if (Directory.Exists(expandedFolder) && !AllowedFolders.Contains(expandedFolder))
+                                AllowedFolders.Add(expandedFolder);
+                        }
                     }
                 }
             }
 
-            AutoDetectVirtualDjPaths();
+            // Saneamiento proactivo: si el path proviene de la máquina de otro usuario (ej. 'djklm' en PC ajena) o no existe físicamente
+            bool isForeignOrBroken = (VdjDatabaseFile != null && VdjDatabaseFile.IndexOf(@"\Users\djklm", StringComparison.OrdinalIgnoreCase) >= 0 && !string.Equals(Environment.UserName, "djklm", StringComparison.OrdinalIgnoreCase)) ||
+                                    (VdjHistoryFolder != null && VdjHistoryFolder.IndexOf(@"\Users\djklm", StringComparison.OrdinalIgnoreCase) >= 0 && !string.Equals(Environment.UserName, "djklm", StringComparison.OrdinalIgnoreCase)) ||
+                                    (string.IsNullOrWhiteSpace(VdjDatabaseFile) || !File.Exists(VdjDatabaseFile)) ||
+                                    (string.IsNullOrWhiteSpace(VdjHistoryFolder) || !Directory.Exists(VdjHistoryFolder));
+
+            AutoDetectVirtualDjPaths(force: isForeignOrBroken);
         }
 
         public static void Save()

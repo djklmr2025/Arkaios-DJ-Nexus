@@ -1,0 +1,52 @@
+MJUC jr. changelog
+www.klanghelm.com
+
+
+01/24/23 version 1.5.0
+- NEW: AAX version: native support for Apple silicon
+
+
+11/05/21 version 1.4.0
+- native Apple M1 support
+- GUI: popup menues and file chooser widgets: stability improvements
+
+
+06/10/20 version 1.3.0
+- GUI performance improvements
+- more robust Mac-installer
+- updated manual
+
+
+12/16/19 version 1.2.0
+- Automation fixes and improvements to ensure coherent behavior across all plugin formats and hosts
+
+
+11/27/19 version 1.1.2
+- FIX: VST3 on Windows: when using a Windows scaling factor other than 100% the GUI had been cropped in some hosts
+
+
+11/26/19 version 1.1.1
+- FIX: freezing of the GUI on Windows systems
+- minor performance improvements
+- better GUI performance
+
+
+11/14/19 version 1.1.0
+- minor performance improvements
+- added VST3 version
+- new Mac installer
+- compatibility with macOS Catalina (macOS 10.15)
+- dropped 32-bit support in order to follow current fulfill security and technical requirements by the OS vendors
+
+
+07/30/15 - version 1.0.1
+- reduced CPU load when using the plugin's internal bypass
+- when used on stereo channels, GR-meter now shows the gain reduction of the stereo sum instead of left channel only
+- FIX: default state gets recalled properly now in ProTools
+- FIX: occasional erratic VU-needle-behavior
+- FIX: OSX: 64-bit AU didn't pass AU-validation on some systems
+- FIX: Windows: overall better compatibility with older Windows versions
+
+
+07/14/15 - version 1.0.0
+- initial release

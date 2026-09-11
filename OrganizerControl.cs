@@ -536,9 +536,7 @@ namespace ArkaiosDJAssistant
 
             try
             {
-                string playlistFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documentos", "VirtualDJ", "Playlists");
-                if (!Directory.Exists(playlistFolder))
-                    playlistFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "VirtualDJ", "Playlists");
+                string playlistFolder = AppSettings.GetVirtualDjPlaylistsFolder();
                 Directory.CreateDirectory(playlistFolder);
 
                 string playlistPath = Path.Combine(playlistFolder, "ARKAIOS Organizer " + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".m3u");

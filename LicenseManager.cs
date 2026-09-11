@@ -30,8 +30,67 @@ namespace ArkaiosDJAssistant
             return "HWID_NOT_FOUND_" + Environment.MachineName;
         }
 
+        public const string OWNER_MASTER_KEY = "QVJLQUlPUy1MSUZFVElNRS1VTklWRVJTQUx8TElGRVRJTUV8REogS0xNUiAvIEFya2Fpb3MgT3duZXJ8T1dORVJ8MjAyNi0wNy0yMVQwMTo1OTo0OC4zMzVafGQ2YTE2MGY1YmY3MzUxYjYxOThmZmVhNmVkMjI5ZjZlZjI0MzJiOWFkODc4ODdlNTM1OTg1Y2U4YWU4Mjk4YWQ=";
+
+        public static string GetCurrentKey()
+        {
+            try
+            {
+                if (File.Exists(licensePath))
+                    return File.ReadAllText(licensePath).Trim();
+            }
+            catch {}
+            return "";
+        }
+
+        public static bool IsOwner()
+        {
+            string key = GetCurrentKey();
+            if (key == OWNER_MASTER_KEY) return true;
+            if (!string.IsNullOrEmpty(key))
+            {
+                try
+                {
+                    string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(key));
+                    if (decoded.Contains("|OWNER|") || decoded.Contains("DJ KLMR / Arkaios Owner")) return true;
+                }
+                catch {}
+            }
+            return false;
+        }
+
+        public static bool HasPoolAccess()
+        {
+            // 1. El Creador / Owner tiene acceso infinito y gratuito permanente a su propio servidor
+            if (IsOwner()) return true;
+
+            // 2. Para los demas usuarios, verificar si tienen licencia valida y activa con plan Pool
+            if (!File.Exists(licensePath)) return false;
+            string key = GetCurrentKey();
+            if (!ValidateKeyLocally(key)) return false;
+
+            try
+            {
+                string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(key));
+                string[] parts = decoded.Split('|');
+                if (parts.Length >= 2)
+                {
+                    string licenseType = parts[1].ToUpperInvariant();
+                    // Tipos con acceso a la nube 5TB
+                    if (licenseType.Contains("LIFETIME") || licenseType.Contains("POOL") || licenseType.Contains("VIP"))
+                        return true;
+                }
+            }
+            catch {}
+
+            return false;
+        }
+
         public static bool IsLicensed()
         {
+            // Bypass instantaneo para el Creador
+            if (IsOwner()) return true;
+
             if (!File.Exists(licensePath)) return false;
             string key = File.ReadAllText(licensePath).Trim();
             

@@ -123,6 +123,8 @@ namespace ArkaiosDJAssistant
         private readonly List<string> downloadedHubTracks = new List<string>();
         private DownloadHubControl downloadHub;
         private TabControl mainTabs;
+        private TabPage cloudPoolTab;
+        private CloudPoolControl cloudPoolControl;
         private TabPage assistantTab;
         private TabPage mediaTab;
         private TabPage agentTab;
@@ -152,6 +154,7 @@ namespace ArkaiosDJAssistant
             mainPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             mainTabs = new TabControl { Dock = DockStyle.Fill };
             assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
+            cloudPoolTab = new TabPage("☁️ Nube ARKAIOS Pool") { BackColor = Color.FromArgb(20, 20, 20) };
             mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
             agentTab = new TabPage("Usar al Agente DJ Assistant") { BackColor = Color.FromArgb(20, 20, 20) };
             allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
@@ -159,6 +162,11 @@ namespace ArkaiosDJAssistant
             hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
             organizerTab = new TabPage("Organizador IA / Renombrador") { BackColor = Color.FromArgb(20, 20, 20) };
             assistantTab.Controls.Add(mainPanel);
+            
+            cloudPoolControl = new CloudPoolControl();
+            cloudPoolControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            cloudPoolTab.Controls.Add(cloudPoolControl);
+
             var allTracksControl = new AllTracksSearchControl();
             allTracksControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
             allTracksTab.Controls.Add(allTracksControl);
@@ -577,6 +585,7 @@ namespace ArkaiosDJAssistant
             TabPage selected = mainTabs.SelectedTab;
             mainTabs.TabPages.Clear();
             mainTabs.TabPages.Add(assistantTab);
+            if (cloudPoolTab != null) mainTabs.TabPages.Add(cloudPoolTab);
             mainTabs.TabPages.Add(mediaTab);
             if (agentTab != null) mainTabs.TabPages.Add(agentTab);
             mainTabs.TabPages.Add(allTracksTab);
