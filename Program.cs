@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Xml;
 using System.Globalization;
+using System.Text;
 
 namespace ArkaiosDJAssistant
 {
@@ -23,6 +24,7 @@ namespace ArkaiosDJAssistant
         public string FileType { get; set; }
         public string RankIcon { get; set; }
         public int MatchScore { get; set; }
+        public bool InAllowedFolders { get; set; }
     }
 
     public static class HarmonicEngine
@@ -559,8 +561,9 @@ namespace ArkaiosDJAssistant
 
             if (!File.Exists(dbPath))
             {
-                lblNowPlaying.Text = "Error: database.xml no encontrado en " + dbPath;
-                lblStatus.Text = "VirtualDJ detectado, pero falta configurar database.xml.";
+                lblNowPlaying.Text = "Error: database.xml no encontrado en " + dbPath + "\n(Haz clic aquí para abrir el asistente de configuración)";
+                lblStatus.Text = "VirtualDJ detectado, pero falta configurar database.xml. Haz clic en 'Configuración' o revisa diagnostico.log.";
+                DiagLog.Write($"[AttachToVirtualDj] ERROR: No existe database.xml en '{dbPath}'.");
                 return;
             }
 
@@ -569,6 +572,7 @@ namespace ArkaiosDJAssistant
             if (!Directory.Exists(vdjHistoryFolder))
             {
                 lblStatus.Text = "VirtualDJ detectado, pero no existe la carpeta History: " + vdjHistoryFolder;
+                DiagLog.Write($"[AttachToVirtualDj] ERROR: No existe carpeta History en '{vdjHistoryFolder}'.");
                 return;
             }
 
@@ -625,7 +629,9 @@ namespace ArkaiosDJAssistant
             }
             else
             {
-                lblNowPlaying.Text = "Error: database.xml no encontrado en " + dbPath;
+                lblNowPlaying.Text = "Error: database.xml no encontrado en " + dbPath + "\n(Haz clic aquí para abrir configuración)";
+                lblStatus.Text = "Falta configurar database.xml. Haz clic aquí para ver el archivo de diagnóstico.";
+                DiagLog.Write($"[MainForm_Load] ERROR: database.xml no encontrado en '{dbPath}'.");
             }
         }
 
@@ -634,14 +640,20 @@ namespace ArkaiosDJAssistant
             try
             {
                 var loadedTracks = new List<Track>();
+                int totalSongsInXml = 0;
+                int discardedEmptyPath = 0;
+                int existingOnDisk = 0;
+                HashSet<string> driveLetters = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
                 using (FileStream fs = new FileStream(xmlPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (XmlReader reader = XmlReader.Create(fs))
+                using (XmlReader reader = XmlReader.Create(fs, new XmlReaderSettings { IgnoreComments = true, IgnoreWhitespace = true }))
                 {
                     Track currentTrack = null;
                     while (reader.Read())
                     {
                         if (reader.NodeType == XmlNodeType.Element && reader.Name == "Song")
                         {
+                            totalSongsInXml++;
                             currentTrack = new Track();
                             currentTrack.FilePath = reader.GetAttribute("FilePath");
                         }
@@ -670,31 +682,53 @@ namespace ArkaiosDJAssistant
                         }
                         else if (currentTrack != null && reader.Name == "Song")
                         {
-                            if (!string.IsNullOrEmpty(currentTrack.FilePath))
+                            if (!string.IsNullOrWhiteSpace(currentTrack.FilePath))
                             {
-                                bool allowed = AppSettings.AllowedFolders.Count == 0;
-                                if (!allowed) {
-                                    foreach(var f in AppSettings.AllowedFolders) {
-                                        if (currentTrack.FilePath.StartsWith(f, StringComparison.OrdinalIgnoreCase)) { allowed = true; break; }
-                                    }
+                                currentTrack.FileName = Path.GetFileName(currentTrack.FilePath);
+                                currentTrack.FileType = Path.GetExtension(currentTrack.FilePath).ToLower();
+                                if (string.IsNullOrEmpty(currentTrack.Title)) currentTrack.Title = Path.GetFileNameWithoutExtension(currentTrack.FilePath);
+                                if (currentTrack.CamelotKey == null) currentTrack.CamelotKey = "";
+
+                                // Informativo: verificar si está bajo AllowedFolders
+                                currentTrack.InAllowedFolders = AppSettings.AllowedFolders.Count == 0 ||
+                                    AppSettings.AllowedFolders.Any(f => AppSettings.IsUnder(currentTrack.FilePath, f));
+
+                                // Letra de unidad para diagnóstico
+                                if (currentTrack.FilePath.Length >= 2 && currentTrack.FilePath[1] == ':')
+                                {
+                                    driveLetters.Add(currentTrack.FilePath.Substring(0, 2).ToUpper());
                                 }
 
-                                if (allowed) {
-                                    currentTrack.FileName = Path.GetFileName(currentTrack.FilePath);
-                                    currentTrack.FileType = Path.GetExtension(currentTrack.FilePath).ToLower();
-                                    if (string.IsNullOrEmpty(currentTrack.Title)) currentTrack.Title = Path.GetFileNameWithoutExtension(currentTrack.FilePath);
-                                    if (currentTrack.CamelotKey == null) currentTrack.CamelotKey = "";
-                                    loadedTracks.Add(currentTrack);
+                                if (File.Exists(currentTrack.FilePath))
+                                {
+                                    existingOnDisk++;
                                 }
+
+                                loadedTracks.Add(currentTrack);
+                            }
+                            else
+                            {
+                                discardedEmptyPath++;
                             }
                             currentTrack = null;
                         }
                     }
                 }
                 allTracks = loadedTracks;
+
+                string driveSummary = string.Join(", ", driveLetters.Take(5));
+                DiagLog.Write($"[LoadDatabase] XML cargado: '{xmlPath}'. Total canciones en XML: {totalSongsInXml}, Cargadas: {loadedTracks.Count}, Descartadas (sin FilePath): {discardedEmptyPath}, Existen en disco: {existingOnDisk}, Unidades detectadas: [{driveSummary}]");
+
+                if (loadedTracks.Count == 0)
+                {
+                    this.Invoke((MethodInvoker)delegate {
+                        lblStatus.Text = $"BD leída ({totalSongsInXml} en XML, {discardedEmptyPath} sin ruta). 0 pistas cargadas. Haz clic para abrir diagnóstico.";
+                    });
+                }
             }
             catch (Exception ex)
             {
+                DiagLog.Write(ex, "Program.LoadDatabase");
                 this.Invoke((MethodInvoker)delegate { MessageBox.Show("Error leyendo XML: " + ex.Message); });
             }
         }
@@ -720,17 +754,20 @@ namespace ArkaiosDJAssistant
             {
                 if (!Directory.Exists(vdjHistoryFolder)) return;
 
-                var m3uFiles = Directory.GetFiles(vdjHistoryFolder, "*.m3u")
+                var historyFiles = Directory.GetFiles(vdjHistoryFolder, "*.*")
+                                        .Where(f => f.EndsWith(".m3u", StringComparison.OrdinalIgnoreCase) ||
+                                                    f.EndsWith(".m3u8", StringComparison.OrdinalIgnoreCase))
                                         .Select(f => new FileInfo(f))
                                         .OrderByDescending(f => f.LastWriteTime)
                                         .ToList();
 
-                if (m3uFiles.Count == 0) return;
+                if (historyFiles.Count == 0) return;
 
-                // Leer el archivo más reciente (hoy)
+                FileInfo latestFile = historyFiles[0];
                 string latestTrackPath = "";
-                using (var fs = new FileStream(m3uFiles[0].FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                using (var sr = new StreamReader(fs))
+
+                using (var fs = new FileStream(latestFile.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs, Encoding.UTF8))
                 {
                     string content = sr.ReadToEnd();
                     var lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -739,8 +776,11 @@ namespace ArkaiosDJAssistant
                         string line = lines[i].Trim();
                         if (line.Length > 0 && !line.StartsWith("#"))
                         {
-                            latestTrackPath = line;
-                            break;
+                            if (line.Contains("\\") || line.Contains("/") || Path.HasExtension(line))
+                            {
+                                latestTrackPath = line;
+                                break;
+                            }
                         }
                     }
                 }
@@ -748,10 +788,14 @@ namespace ArkaiosDJAssistant
                 if (!string.IsNullOrEmpty(latestTrackPath) && latestTrackPath != currentPlayingFile)
                 {
                     currentPlayingFile = latestTrackPath;
+                    DiagLog.Write($"[CheckHistory] Pista detectada: '{latestTrackPath}' desde '{latestFile.Name}'");
                     UpdateRecommendations(currentPlayingFile);
                 }
             }
-            catch { /* Ignorar errores de lectura si el archivo esta bloqueado */ }
+            catch (Exception ex)
+            {
+                DiagLog.Write(ex, "Program.CheckHistory");
+            }
         }
 
         private void UpdateRecommendations(string filePath)
@@ -768,6 +812,7 @@ namespace ArkaiosDJAssistant
 
                 if (playingTrack == null)
                 {
+                    DiagLog.Write($"[UpdateRecommendations] AVISO: No se encontró metadata en DB para: '{filePath}' (Total tracks en DB: {allTracks?.Count ?? 0})");
                     if (this.IsHandleCreated && !this.IsDisposed)
                     {
                         this.Invoke(new Action(() => {
@@ -1336,6 +1381,18 @@ namespace ArkaiosDJAssistant
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            try
+            {
+                DiagLog.Write("==================================================================");
+                DiagLog.Write("=== Arkaios DJ Nexus iniciando ===");
+                DiagLog.Write($"Usuario: {Environment.UserName} | SO: {Environment.OSVersion} | Runtime: {Environment.Version} ({System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription})");
+                DiagLog.Write($"MyDocuments: {Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)}");
+                DiagLog.Write($"UserProfile: {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}");
+                DiagLog.Write($"ApplicationData: {Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)}");
+                DiagLog.Write($"LocalApplicationData: {Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)}");
+            }
+            catch { }
             
             if (!LicenseManager.IsLicensed())
             {

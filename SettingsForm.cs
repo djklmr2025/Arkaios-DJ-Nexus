@@ -53,10 +53,28 @@ namespace ArkaiosDJAssistant
                 Font = new Font("Segoe UI", 9),
                 Location = new Point(20, 110),
                 Width = 520,
-                Height = 42,
+                Height = 35,
                 ForeColor = Color.LightGray
             };
             tabGeneral.Controls.Add(lblVdjNote);
+
+            Button btnReconfigureVdj = new Button
+            {
+                Text = "Reconfigurar Rutas de VirtualDJ...",
+                Location = new Point(20, 150),
+                Width = 250,
+                Height = 32,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(50, 50, 50),
+                ForeColor = Color.White,
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+            };
+            btnReconfigureVdj.Click += (s, e) => {
+                var setup = new SetupForm();
+                setup.ShowDialog(this);
+            };
+            tabGeneral.Controls.Add(btnReconfigureVdj);
 
             // Options Tab
             TabPage tabOptions = new TabPage("Opciones") { BackColor = Color.FromArgb(30, 30, 30) };
@@ -199,6 +217,10 @@ namespace ArkaiosDJAssistant
             // Bottom Panel
             Panel pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.FromArgb(25, 25, 25) };
             this.Controls.Add(pnlBottom);
+
+            Button btnDiag = new Button { Text = "Ver Diagnóstico (.log)", Location = new Point(20, 15), Width = 160, Height = 30, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(50, 50, 50), ForeColor = Color.White, Cursor = Cursors.Hand };
+            btnDiag.Click += (s, e) => DiagLog.OpenLog();
+            pnlBottom.Controls.Add(btnDiag);
             
             Button btnSave = new Button { Text = "Save", Location = new Point(this.Width - 140, 15), Width = 100, Height = 30, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 120, 215) };
             btnSave.Click += BtnSave_Click;

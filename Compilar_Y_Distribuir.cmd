@@ -106,8 +106,9 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 echo [OK] Instalador creado:
 echo %~dp0dist\ArkaiosDJ_Nexus_Setup.exe
-copy /y "%~dp0dist\ArkaiosDJ_Nexus_Setup.exe" "%~dp0ArkaiosDJ_Nexus_Setup_v1.3.0.exe" >nul
-echo [OK] Instalador sincronizado en la raiz: ArkaiosDJ_Nexus_Setup_v1.3.0.exe
+copy /y "%~dp0dist\ArkaiosDJ_Nexus_Setup.exe" "%~dp0ArkaiosDJ_Nexus_Setup.exe" >nul
+copy /y "%~dp0dist\ArkaiosDJ_Nexus_Setup.exe" "%~dp0ArkaiosDJ_Nexus_Setup_v1.4.1.exe" >nul
+echo [OK] Instalador sincronizado en la raiz: ArkaiosDJ_Nexus_Setup.exe y ArkaiosDJ_Nexus_Setup_v1.4.1.exe
 
 :done
 echo.

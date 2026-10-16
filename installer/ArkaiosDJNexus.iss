@@ -1,5 +1,5 @@
 #define AppName "Arkaios DJ Nexus"
-#define AppVersion "1.3.1"
+#define AppVersion "1.4.1"
 #define AppPublisher "Arkaios"
 #define AppExeName "ArkaiosDJ.exe"
 
