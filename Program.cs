@@ -158,7 +158,7 @@ namespace ArkaiosDJAssistant
             assistantTab = new TabPage("Auto Help + Camelot") { BackColor = Color.FromArgb(20, 20, 20) };
             cloudPoolTab = new TabPage("☁️ Nube ARKAIOS Pool") { BackColor = Color.FromArgb(20, 20, 20) };
             mediaTab = new TabPage("Buscar y descargar") { BackColor = Color.FromArgb(20, 20, 20) };
-            agentTab = new TabPage("Usar al Agente DJ Assistant") { BackColor = Color.FromArgb(20, 20, 20) };
+            agentTab = new TabPage("Descargas web") { BackColor = Color.FromArgb(20, 20, 20) };
             allTracksTab = new TabPage("Buscar All Tracks") { BackColor = Color.FromArgb(20, 20, 20) };
             hitsTab = new TabPage("Hits / Plataformas") { BackColor = Color.FromArgb(20, 20, 20) };
             hubTab = new TabPage("Descargas / Hub local") { BackColor = Color.FromArgb(20, 20, 20) };
@@ -176,8 +176,8 @@ namespace ArkaiosDJAssistant
             mediaSearch.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
             mediaSearch.TrackViewRequested += path => AddTrackToHub(path, true);
             mediaTab.Controls.Add(mediaSearch);
-            var agentControl = new AgentDjControl();
-            agentControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
+            var agentControl = new WebDownloadsControl();
+
             agentTab.Controls.Add(agentControl);
             var hitsControl = new HitsTracksControl();
             hitsControl.TrackSentToHub += path => { AddTrackToHub(path, true); downloadHub.AddDownloadedFile(path); };
